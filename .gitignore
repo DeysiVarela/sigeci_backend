@@ -17,3 +17,6 @@ __pycache__/
 # Archivos del sistema
 .DS_Store
 Thumbs.db
+
+# Base de datos local de desarrollo
+db.sqlite3
