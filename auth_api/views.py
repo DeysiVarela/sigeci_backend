@@ -11,11 +11,19 @@ from django.views.decorators.csrf import csrf_exempt
 RECAPTCHA_VERIFY_URL = 'https://www.google.com/recaptcha/api/siteverify'
 
 
-def _response(data, status=200):
+def _response(data, status=200, origin=None):
+    allowed_origins = {
+        origin.strip()
+        for origin in os.getenv(
+            'FRONTEND_ORIGINS',
+            os.getenv('FRONTEND_ORIGIN', 'http://localhost:5173'),
+        ).split(',')
+    }
     response = JsonResponse(data, status=status)
-    response['Access-Control-Allow-Origin'] = os.getenv(
-        'FRONTEND_ORIGIN',
-        'http://localhost:5173',
+    response['Access-Control-Allow-Origin'] = (
+        origin
+        if origin in allowed_origins
+        else next(iter(allowed_origins), 'http://localhost:5173')
     )
     response['Access-Control-Allow-Headers'] = 'Content-Type'
     response['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
@@ -28,10 +36,11 @@ def health(request):
 
 @csrf_exempt
 def login(request):
+    origin = request.headers.get('Origin')
     if request.method == 'OPTIONS':
-        return _response({})
+        return _response({}, origin=origin)
     if request.method != 'POST':
-        return _response({'message': 'Método no permitido.'}, status=405)
+        return _response({'message': 'Método no permitido.'}, status=405, origin=origin)
 
     try:
         payload = json.loads(request.body)
@@ -39,6 +48,7 @@ def login(request):
         return _response(
             {'message': 'La solicitud no tiene un formato válido.'},
             status=400,
+            origin=origin,
         )
 
     identifier = payload.get('identifier')
@@ -48,6 +58,7 @@ def login(request):
         return _response(
             {'message': 'Correo, contraseña y CAPTCHA son obligatorios.'},
             status=400,
+            origin=origin,
         )
 
     secret_key = os.getenv('RECAPTCHA_SECRET_KEY')
@@ -55,12 +66,14 @@ def login(request):
         return _response(
             {'message': 'El servicio de autenticación no está disponible.'},
             status=503,
+            origin=origin,
         )
 
     if not _verify_captcha(captcha_token, request.META.get('REMOTE_ADDR')):
         return _response(
             {'message': 'La verificación CAPTCHA no es válida. Inténtalo nuevamente.'},
             status=400,
+            origin=origin,
         )
 
     if (
@@ -70,12 +83,13 @@ def login(request):
         return _response(
             {'message': 'Las credenciales no son válidas.'},
             status=401,
+            origin=origin,
         )
 
     return _response({
         'message': 'Inicio de sesión exitoso.',
         'user': {'identifier': identifier},
-    })
+    }, origin=origin)
 
 
 def _verify_captcha(token, remote_ip):
