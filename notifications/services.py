@@ -79,3 +79,5 @@ def send_recovery_pin_email(recipient_email: str, pin: str) -> None:
         raise PinEmailError(
             "No fue posible confirmar el envío del correo."
         )
+        
+    logger.info("Correo de recuperación enviado correctamente.")
