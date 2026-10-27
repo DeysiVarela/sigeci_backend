@@ -1,6 +1,9 @@
 """Evidencia CRUD / filtros / permisos / recuperación (CA-07). Ejecutar: python manage.py test accounts"""
+from unittest.mock import patch
+
 from django.core import mail
 from django.core.management import call_command
+from django.test import override_settings
 from django.core.cache import cache
 from rest_framework.test import APITestCase
 from rest_framework.throttling import ScopedRateThrottle
@@ -130,3 +133,38 @@ class PasswordRecoveryTests(BaseCase):
     def test_pin_stored_hashed(self):
         self.client.post("/api/auth/password/forgot/", {"email": "member@t.co"}, format="json")
         self.assertNotEqual(PasswordResetPin.objects.first().pin_hash, self._pin())
+
+
+class LoginContractTests(BaseCase):
+    """Contrato final: POST /api/auth/login { identifier, password, captchaToken }"""
+
+    def post(self, url, body):
+        return self.client.post(url, body, format="json")
+
+    def test_identifier_with_and_without_trailing_slash(self):
+        body = {"identifier": "admin@t.co", "password": PWD}
+        self.assertEqual(self.post("/api/auth/login", body).status_code, 200)
+        self.assertEqual(self.post("/api/auth/login/", body).status_code, 200)
+
+    def test_email_alias_still_works(self):
+        self.assertEqual(self.post("/api/auth/login/", {"email": "admin@t.co", "password": PWD}).status_code, 200)
+
+    def test_missing_identifier(self):
+        self.assertEqual(self.post("/api/auth/login/", {"password": PWD}).status_code, 400)
+
+    def test_captcha_not_enforced_when_not_configured(self):
+        r = self.post("/api/auth/login", {"identifier": "admin@t.co", "password": PWD, "captchaToken": ""})
+        self.assertEqual(r.status_code, 200)
+
+    @override_settings(CAPTCHA_SECRET_KEY="secret")
+    def test_captcha_required_when_configured(self):
+        r = self.post("/api/auth/login", {"identifier": "admin@t.co", "password": PWD})
+        self.assertEqual(r.status_code, 400)
+
+    @override_settings(CAPTCHA_SECRET_KEY="secret")
+    def test_captcha_rejected_and_accepted(self):
+        body = {"identifier": "admin@t.co", "password": PWD, "captchaToken": "tok"}
+        with patch("accounts.views.verify_captcha", return_value=False):
+            self.assertEqual(self.post("/api/auth/login", body).status_code, 400)
+        with patch("accounts.views.verify_captcha", return_value=True):
+            self.assertEqual(self.post("/api/auth/login", body).status_code, 200)

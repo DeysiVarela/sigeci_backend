@@ -18,6 +18,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from .captcha import verify_captcha
 from .models import PasswordResetPin, Profile, User
 from .permissions import HasProfilePermission
 from .serializers import (
@@ -67,7 +68,11 @@ class LoginView(APIView):
     def post(self, request):
         ser = LoginSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
-        user = _eligible_user(ser.validated_data["email"])
+        if not verify_captcha(ser.validated_data.get("captchaToken"), request.META.get("REMOTE_ADDR")):
+            return Response(
+                {"detail": "Verificación CAPTCHA inválida o vencida."}, status=status.HTTP_400_BAD_REQUEST
+            )
+        user = _eligible_user(ser.validated_data["identifier"])
         # Mismo mensaje para "no existe", "inactivo" y "clave incorrecta"
         if user is None or not user.check_password(ser.validated_data["password"]):
             return Response(INVALID_CREDENTIALS, status=status.HTTP_401_UNAUTHORIZED)
