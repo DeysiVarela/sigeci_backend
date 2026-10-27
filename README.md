@@ -114,3 +114,27 @@ Las credenciales de conexión a la base de datos deben mantenerse fuera del repo
 Asignatura: Desarrollo de Software I
 Proyecto: Sistema de gestión de una conferencia científica
 Universidad del Valle
+
+## 8. API de autenticación local
+
+El endpoint de login de SCRUM-18 está disponible en:
+
+```text
+POST /api/auth/login
+GET /health
+```
+
+Configura estas variables en `backend/.env` antes de iniciar el servidor:
+
+```env
+DJANGO_SECRET_KEY=clave-local-de-desarrollo
+FRONTEND_ORIGIN=http://localhost:5173
+RECAPTCHA_SECRET_KEY=clave-secreta-de-Google
+DEMO_USER_EMAIL=demo@sigeci.local
+DEMO_USER_PASSWORD=DemoPass123!
+```
+
+`RECAPTCHA_SECRET_KEY` solo se utiliza en el backend. El frontend debe usar
+únicamente la clave pública (`VITE_RECAPTCHA_SITE_KEY`). Las credenciales
+`DEMO_USER_*` son temporales para pruebas locales, hasta integrar el sistema de
+usuarios real.
