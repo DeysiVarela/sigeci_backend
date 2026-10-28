@@ -99,16 +99,51 @@ Las pruebas de `auth_api/tests.py` cubren los siguientes escenarios:
 
 Las pruebas automatizadas simulan la respuesta de Google. Por tanto, sus resultados no sustituyen una prueba de integración con credenciales reales.
 
-## 9. Evidencias pendientes
 
-Para completar el criterio de aceptación CA-06, se deben conservar evidencias de:
 
-- [ ] Token válido.
-- [ ] Token ausente.
-- [ ] Token rechazado o inválido.
-- [ ] Proveedor no disponible.
+## 9. Evidencias y estado de verificación
 
-Se pueden utilizar los resultados de las pruebas automatizadas y complementarlos con evidencias de la integración real cuando esté configurada.
+Las evidencias de esta historia de usuario se adjuntan directamente a la tarea SCRUM-14 en Jira.
+
+### 9.1. Pruebas automatizadas
+
+**Archivo:** `SCRUM-14-E01-pruebas-automatizadas.png`
+
+**Estado:** Completado.
+
+Se ejecutaron las siete pruebas automatizadas de `auth_api` y todas finalizaron correctamente.
+
+### 9.2. Token inválido
+
+**Archivo:** `SCRUM-14-E02-captcha-invalido.png`
+
+**Estado:** Completado.
+
+Se envió un token ficticio al servicio de verificación de Google. El proveedor respondió con `success: false` y el código `invalid-input-response`.
+
+### 9.3. Token ausente
+
+**Archivo:** `SCRUM-14-E03-captcha-ausente.png`
+
+**Estado:** Completado.
+
+Se envió una solicitud de inicio de sesión sin el campo `captchaToken`. El backend respondió con HTTP 400 y un mensaje controlado indicando que los datos obligatorios estaban ausentes.
+
+### 9.4. Proveedor no disponible
+
+**Archivo:** `SCRUM-14-E04-proveedor-no-disponible.png`
+
+**Estado:** Completado.
+
+La prueba automatizada simuló un fallo de comunicación con el proveedor. El backend rechazó la autenticación de forma controlada y la prueba finalizó correctamente.
+
+### 9.5. Token válido con Google real
+
+**Estado:** Pendiente de verificación de integración.
+
+La prueba automatizada del escenario exitoso utiliza una respuesta simulada del proveedor. Todavía no se ha comprobado el inicio de sesión mediante un token real generado y aceptado por Google reCAPTCHA.
+
+Las evidencias se conservan como adjuntos de SCRUM-14 en Jira. Los resultados de las pruebas automatizadas no sustituyen la comprobación de integración con el proveedor real.
 
 ## 10. Alcance y limitaciones
 
