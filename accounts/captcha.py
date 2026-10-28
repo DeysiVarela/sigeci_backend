@@ -1,40 +1,32 @@
-"""Verificación de CAPTCHA (SCRUM-15, CA-02).
+"""CAPTCHA del login (SCRUM-15, CA-02), integrado con auth_api (SCRUM-18).
 
-Si CAPTCHA_SECRET_KEY está vacío (desarrollo) no se exige. Si está definido,
-el token es obligatorio y se valida contra CAPTCHA_VERIFY_URL; ante cualquier
-fallo del servicio se rechaza el intento (fail-closed).
-Sirve para reCAPTCHA y para Cloudflare Turnstile (solo cambia la URL).
+- Misma variable que auth_api: RECAPTCHA_SECRET_KEY.
+- La verificación contra Google es UNA sola: la de auth_api (`_verify_captcha`).
+  Aquí solo se define la política: obligatorio por defecto y fail-closed.
+- Solo en desarrollo se puede desactivar con CAPTCHA_REQUIRED=False
+  (en settings se fuerza a True cuando DEBUG está apagado).
 """
-import json
 import logging
-import urllib.parse
-import urllib.request
+import os
 
 from django.conf import settings
+
+from auth_api.views import _verify_captcha
 
 logger = logging.getLogger(__name__)
 
 
-def captcha_enabled():
-    return bool(getattr(settings, "CAPTCHA_SECRET_KEY", ""))
+def captcha_required():
+    return getattr(settings, "CAPTCHA_REQUIRED", True)
+
+
+def captcha_configured():
+    return bool(os.getenv("RECAPTCHA_SECRET_KEY"))
 
 
 def verify_captcha(token, remote_ip=None):
-    if not captcha_enabled():
+    if not captcha_required():
         return True
-    if not token:
+    if not captcha_configured() or not token:
         return False
-    data = {"secret": settings.CAPTCHA_SECRET_KEY, "response": token}
-    if remote_ip:
-        data["remoteip"] = remote_ip
-    req = urllib.request.Request(
-        settings.CAPTCHA_VERIFY_URL,
-        data=urllib.parse.urlencode(data).encode(),
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            return bool(json.load(resp).get("success"))
-    except Exception:  # noqa: BLE001
-        logger.exception("No se pudo verificar el CAPTCHA")
-        return False
+    return _verify_captcha(token, remote_ip)

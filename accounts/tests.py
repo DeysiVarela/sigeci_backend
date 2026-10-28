@@ -1,12 +1,14 @@
 """Evidencia CRUD / filtros / permisos / recuperación (CA-07). Ejecutar: python manage.py test accounts"""
+import os
 from unittest.mock import patch
 
-from django.core import mail
 from django.core.management import call_command
 from django.test import override_settings
 from django.core.cache import cache
 from rest_framework.test import APITestCase
 from rest_framework.throttling import ScopedRateThrottle
+
+from notifications.services import PinEmailError
 
 from .models import PasswordResetPin, Profile, User
 
@@ -21,6 +23,7 @@ def make_user(email, profile_name, active=True, password=PWD):
     return u
 
 
+@override_settings(CAPTCHA_REQUIRED=False)  # los tests de captcha lo activan explícitamente
 class BaseCase(APITestCase):
     def setUp(self):
         cache.clear()
@@ -103,15 +106,19 @@ class UserCrudTests(BaseCase):
 
 
 class PasswordRecoveryTests(BaseCase):
-    def _pin(self):
-        body = mail.outbox[-1].body
-        return body.split("Tu PIN es: ")[1][:6]
+    """El envío del correo es de notifications; aquí se intercepta para leer el PIN."""
+
+    def forgot(self, email):
+        with patch("accounts.views.send_recovery_pin_email") as sender:
+            r = self.client.post("/api/auth/password/forgot/", {"email": email}, format="json")
+        return r, sender
 
     def test_full_flow_and_pin_single_use(self):
-        r1 = self.client.post("/api/auth/password/forgot/", {"email": "member@t.co"}, format="json")
-        r2 = self.client.post("/api/auth/password/forgot/", {"email": "nadie@t.co"}, format="json")
+        r1, sender = self.forgot("member@t.co")
+        r2, sender2 = self.forgot("nadie@t.co")
         self.assertEqual(r1.data, r2.data)  # no revela si el correo existe
-        pin = self._pin()
+        sender2.assert_not_called()
+        pin = sender.call_args.args[1]
         new = "Nueva.Clave9"
         ok = self.client.post("/api/auth/password/reset/", {"email": "member@t.co", "pin": pin, "password": new}, format="json")
         self.assertEqual(ok.status_code, 200)
@@ -121,8 +128,8 @@ class PasswordRecoveryTests(BaseCase):
         self.assertEqual(again.status_code, 400)
 
     def test_wrong_pin_and_attempt_limit(self):
-        self.client.post("/api/auth/password/forgot/", {"email": "member@t.co"}, format="json")
-        real = self._pin()
+        _, sender = self.forgot("member@t.co")
+        real = sender.call_args.args[1]
         wrong = "000000" if real != "000000" else "111111"
         for _ in range(5):
             r = self.client.post("/api/auth/password/reset/", {"email": "member@t.co", "pin": wrong, "password": "Nueva.Clave9"}, format="json")
@@ -131,8 +138,13 @@ class PasswordRecoveryTests(BaseCase):
         self.assertEqual(r.status_code, 400)  # bloqueado tras 5 intentos
 
     def test_pin_stored_hashed(self):
-        self.client.post("/api/auth/password/forgot/", {"email": "member@t.co"}, format="json")
-        self.assertNotEqual(PasswordResetPin.objects.first().pin_hash, self._pin())
+        _, sender = self.forgot("member@t.co")
+        self.assertNotEqual(PasswordResetPin.objects.first().pin_hash, sender.call_args.args[1])
+
+    def test_email_failure_does_not_leak(self):
+        with patch("accounts.views.send_recovery_pin_email", side_effect=PinEmailError("x")):
+            r = self.client.post("/api/auth/password/forgot/", {"email": "member@t.co"}, format="json")
+        self.assertEqual(r.status_code, 200)
 
 
 class LoginContractTests(BaseCase):
@@ -152,19 +164,32 @@ class LoginContractTests(BaseCase):
     def test_missing_identifier(self):
         self.assertEqual(self.post("/api/auth/login/", {"password": PWD}).status_code, 400)
 
-    def test_captcha_not_enforced_when_not_configured(self):
+    def test_captcha_not_enforced_when_disabled(self):
         r = self.post("/api/auth/login", {"identifier": "admin@t.co", "password": PWD, "captchaToken": ""})
         self.assertEqual(r.status_code, 200)
 
-    @override_settings(CAPTCHA_SECRET_KEY="secret")
-    def test_captcha_required_when_configured(self):
+    @override_settings(CAPTCHA_REQUIRED=True)
+    @patch.dict(os.environ, {"RECAPTCHA_SECRET_KEY": "secret"})
+    def test_captcha_required_when_enabled(self):
         r = self.post("/api/auth/login", {"identifier": "admin@t.co", "password": PWD})
         self.assertEqual(r.status_code, 400)
 
-    @override_settings(CAPTCHA_SECRET_KEY="secret")
+    @override_settings(CAPTCHA_REQUIRED=True)
+    @patch.dict(os.environ, {"RECAPTCHA_SECRET_KEY": ""})
+    def test_captcha_unavailable_without_secret(self):
+        body = {"identifier": "admin@t.co", "password": PWD, "captchaToken": "tok"}
+        self.assertEqual(self.post("/api/auth/login", body).status_code, 503)
+
+    @override_settings(CAPTCHA_REQUIRED=True)
+    @patch.dict(os.environ, {"RECAPTCHA_SECRET_KEY": "secret"})
     def test_captcha_rejected_and_accepted(self):
         body = {"identifier": "admin@t.co", "password": PWD, "captchaToken": "tok"}
-        with patch("accounts.views.verify_captcha", return_value=False):
+        with patch("accounts.captcha._verify_captcha", return_value=False):
             self.assertEqual(self.post("/api/auth/login", body).status_code, 400)
-        with patch("accounts.views.verify_captcha", return_value=True):
+        with patch("accounts.captcha._verify_captcha", return_value=True):
             self.assertEqual(self.post("/api/auth/login", body).status_code, 200)
+
+    def test_login_route_is_the_real_one(self):
+        """/api/auth/login debe devolver JWT (no el login de demostración de auth_api)."""
+        r = self.post("/api/auth/login", {"identifier": "admin@t.co", "password": PWD})
+        self.assertIn("access", r.data)

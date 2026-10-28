@@ -4,7 +4,6 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth.hashers import check_password, make_password
-from django.core.mail import send_mail
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework import status, viewsets
@@ -18,7 +17,9 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .captcha import verify_captcha
+from notifications.services import PinEmailError, send_recovery_pin_email
+
+from .captcha import captcha_configured, captcha_required, verify_captcha
 from .models import PasswordResetPin, Profile, User
 from .permissions import HasProfilePermission
 from .serializers import (
@@ -68,6 +69,12 @@ class LoginView(APIView):
     def post(self, request):
         ser = LoginSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
+        if captcha_required() and not captcha_configured():
+            logger.error("CAPTCHA obligatorio pero RECAPTCHA_SECRET_KEY no está configurada: login deshabilitado.")
+            return Response(
+                {"detail": "El servicio de autenticación no está disponible."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
         if not verify_captcha(ser.validated_data.get("captchaToken"), request.META.get("REMOTE_ADDR")):
             return Response(
                 {"detail": "Verificación CAPTCHA inválida o vencida."}, status=status.HTTP_400_BAD_REQUEST
@@ -138,15 +145,11 @@ class ForgotPasswordView(APIView):
                         expires_at=now + timedelta(minutes=settings.PASSWORD_RESET_PIN_MINUTES),
                     )
                 try:
-                    send_mail(
-                        "SIGECI - PIN para restablecer tu contraseña",
-                        f"Tu PIN es: {pin}\n\nVence en {settings.PASSWORD_RESET_PIN_MINUTES} minutos. "
-                        "Si no lo solicitaste, ignora este mensaje.",
-                        settings.DEFAULT_FROM_EMAIL,
-                        [user.user_email],
-                    )
-                except Exception:  # noqa: BLE001 - no revelar nada al cliente
-                    logger.exception("No se pudo enviar el PIN de recuperación (user_id=%s)", user.pk)
+                    send_recovery_pin_email(user.user_email, pin)
+                except PinEmailError:
+                    logger.error("No se pudo enviar el PIN de recuperación (user_id=%s)", user.pk)
+                except Exception:  # noqa: BLE001 - nunca revelar nada al cliente
+                    logger.exception("Error inesperado enviando el PIN (user_id=%s)", user.pk)
         return Response(FORGOT_GENERIC)
 
 

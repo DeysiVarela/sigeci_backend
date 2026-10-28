@@ -11,21 +11,13 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 import os
+from datetime import timedelta
 from pathlib import Path
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 load_dotenv(BASE_DIR / ".env")
-
-# Configuración del correo SMTP
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.sendgrid.net")
-EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
-EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True").lower() == "true"
-EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "apikey")
-EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
-DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL")
 
 
 # Quick-start development settings - unsuitable for production
@@ -38,6 +30,28 @@ SECRET_KEY = os.getenv('DJANGO_SECRET_KEY')
 DEBUG = True
 
 ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+
+
+# ---------------------------------------------------------------------------
+# Correo (SCRUM-13: SendGrid SMTP). Una sola definición de EMAIL_BACKEND:
+#   1. Si EMAIL_BACKEND está en el entorno, se respeta (ej. consola o locmem).
+#   2. Si hay credenciales SMTP (EMAIL_HOST_PASSWORD) o DEBUG está apagado -> SMTP real.
+#   3. Solo en desarrollo y sin credenciales -> consola (el PIN se imprime en el servidor).
+# Los tests de Django usan automáticamente un backend en memoria: nunca envían correo real.
+# ---------------------------------------------------------------------------
+EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.sendgrid.net")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True").lower() == "true"
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "apikey")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL")
+
+if os.getenv("EMAIL_BACKEND"):
+    EMAIL_BACKEND = os.environ["EMAIL_BACKEND"]
+elif EMAIL_HOST_PASSWORD or not DEBUG:
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+else:
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
 
 # Application definition
@@ -154,8 +168,6 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # ---------------------------------------------------------------------------
 # API (DRF + JWT) - SCRUM-15 / SCRUM-16
 # ---------------------------------------------------------------------------
-from datetime import timedelta  # noqa: E402
-
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': ['accounts.authentication.SigeciJWTAuthentication'],
     'DEFAULT_PERMISSION_CLASSES': ['rest_framework.permissions.IsAuthenticated'],
@@ -176,14 +188,10 @@ SIMPLE_JWT = {
 # CORS: origen del frontend (Vite)
 CORS_ALLOWED_ORIGINS = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:5173').split(',')
 
-# Correo: en desarrollo imprime el mensaje (con el PIN) en la consola del servidor.
-EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
-EMAIL_HOST = os.getenv('EMAIL_HOST', '')
-EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
-EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
-EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
-EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True') == 'True'
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'SIGECI <no-reply@sigeci.local>')
+# reCAPTCHA: la clave (RECAPTCHA_SECRET_KEY) la lee auth_api del entorno. El CAPTCHA es
+# obligatorio siempre, salvo que en DESARROLLO se ponga CAPTCHA_REQUIRED=False.
+# Con DEBUG apagado no se puede desactivar.
+CAPTCHA_REQUIRED = (os.getenv('CAPTCHA_REQUIRED', 'True').lower() == 'true') or not DEBUG
 
 # Parámetros del PIN de recuperación (CA-06 de SCRUM-15): VALORES PROPUESTOS,
 # pendientes de aprobación del equipo.
