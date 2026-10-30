@@ -139,11 +139,19 @@ La prueba automatizada simuló un fallo de comunicación con el proveedor. El ba
 
 ### 9.5. Token válido con Google real
 
-**Estado:** Pendiente de verificación de integración.
+**Archivos:**
+- `SCRUM-14-E05-token-valido-google-real.png`
+- `SCRUM-14-E05-respuesta-login-exitoso.png`
 
-La prueba automatizada del escenario exitoso utiliza una respuesta simulada del proveedor. Todavía no se ha comprobado el inicio de sesión mediante un token real generado y aceptado por Google reCAPTCHA.
+**Estado:** Completado.
 
-Las evidencias se conservan como adjuntos de SCRUM-14 en Jira. Los resultados de las pruebas automatizadas no sustituyen la comprobación de integración con el proveedor real.
+Se realizó una prueba de integración utilizando el frontend de SIGECI y el servicio real de Google reCAPTCHA v2.
+
+Se generó un token nuevo mediante el widget de Google y se envió junto con el identificador y la contraseña al endpoint `POST /api/auth/login`.
+
+El backend completó la verificación y respondió con HTTP 200 OK. La respuesta confirmó el inicio de sesión exitoso y el frontend permitió el acceso a la aplicación.
+
+Las evidencias se adjuntan a la tarea SCRUM-14 en Jira. Esta prueba complementa las pruebas automatizadas, que utilizan respuestas simuladas del proveedor.
 
 ## 10. Alcance y limitaciones
 

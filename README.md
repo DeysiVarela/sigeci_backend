@@ -71,6 +71,21 @@ Verificar las dependencias:
 python -m pip check
 ```
 
+### Variables de entorno
+
+Crear el archivo `.env` en la raíz del proyecto tomando como referencia `.env.example`.
+
+Para desarrollo local, configurar:
+
+```env
+DJANGO_DEBUG=True
+DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
+```
+
+En producción, establecer `DJANGO_DEBUG=False` y configurar `DJANGO_ALLOWED_HOSTS` con los dominios autorizados para acceder a la aplicación.
+
+No se debe utilizar `DEBUG=True` ni el comodín `*` en producción.
+
 Comprobar la configuración de Django:
 
 ```powershell
@@ -124,7 +139,7 @@ POST /api/auth/login
 GET /health
 ```
 
-Configura estas variables en `backend/.env` antes de iniciar el servidor:
+Configura estas variables en .env, ubicado en la raíz del proyecto, antes de iniciar el servidor:
 
 ```env
 DJANGO_SECRET_KEY=clave-local-de-desarrollo
