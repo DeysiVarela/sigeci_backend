@@ -11,22 +11,13 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 import os
+from datetime import timedelta
 from pathlib import Path
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 load_dotenv(BASE_DIR / ".env")
-
-# Configuración del correo SMTP
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.sendgrid.net")
-EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
-EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "10"))
-EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True").lower() == "true"
-EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "apikey")
-EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
-DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL")
 
 
 # Quick-start development settings - unsuitable for production
@@ -48,6 +39,29 @@ ALLOWED_HOSTS = [
 ]
 
 
+# ---------------------------------------------------------------------------
+# Correo (SCRUM-13: SendGrid SMTP). Una sola definición de EMAIL_BACKEND:
+#   1. Si EMAIL_BACKEND está en el entorno, se respeta (ej. consola o locmem).
+#   2. Si hay credenciales SMTP (EMAIL_HOST_PASSWORD) o DEBUG está apagado -> SMTP real.
+#   3. Solo en desarrollo y sin credenciales -> consola (el PIN se imprime en el servidor).
+# Los tests de Django usan automáticamente un backend en memoria: nunca envían correo real.
+# ---------------------------------------------------------------------------
+EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.sendgrid.net")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "10"))
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True").lower() == "true"
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "apikey")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL")
+
+if os.getenv("EMAIL_BACKEND"):
+    EMAIL_BACKEND = os.environ["EMAIL_BACKEND"]
+elif EMAIL_HOST_PASSWORD or not DEBUG:
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+else:
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -57,11 +71,15 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_framework',
+    'corsheaders',
+    'accounts',
     'auth_api',
     'notifications',
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -135,9 +153,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'es'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'America/Bogota'
 
 USE_I18N = True
 
@@ -153,3 +171,39 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+# ---------------------------------------------------------------------------
+# API (DRF + JWT) - SCRUM-15 / SCRUM-16
+# ---------------------------------------------------------------------------
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': ['accounts.authentication.SigeciJWTAuthentication'],
+    'DEFAULT_PERMISSION_CLASSES': ['rest_framework.permissions.IsAuthenticated'],
+    'DEFAULT_THROTTLE_RATES': {
+        'auth': '10/min',            # login y refresh
+        'password_reset': '5/min',   # solicitar PIN / restablecer
+    },
+}
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'USER_ID_FIELD': 'user_id',
+    'USER_ID_CLAIM': 'user_id',
+    'AUTH_HEADER_TYPES': ('Bearer',),
+}
+
+# CORS: origen del frontend (Vite)
+CORS_ALLOWED_ORIGINS = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:5173').split(',')
+
+# reCAPTCHA: la clave (RECAPTCHA_SECRET_KEY) la lee auth_api del entorno. El CAPTCHA es
+# obligatorio siempre, salvo que en DESARROLLO se ponga CAPTCHA_REQUIRED=False.
+# Con DEBUG apagado no se puede desactivar.
+CAPTCHA_REQUIRED = (os.getenv('CAPTCHA_REQUIRED', 'True').lower() == 'true') or not DEBUG
+
+# Parámetros del PIN de recuperación (CA-06 de SCRUM-15): VALORES PROPUESTOS,
+# pendientes de aprobación del equipo.
+PASSWORD_RESET_PIN_LENGTH = 6
+PASSWORD_RESET_PIN_MINUTES = 10
+PASSWORD_RESET_MAX_ATTEMPTS = 5
+PASSWORD_RESET_RESEND_SECONDS = 60
