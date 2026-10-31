@@ -27,9 +27,16 @@ load_dotenv(BASE_DIR / ".env")
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DJANGO_DEBUG', 'False').lower() == 'true'
+DEBUG = os.getenv("DJANGO_DEBUG", "False").strip().lower() == "true"
 
-ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if h.strip()]
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.getenv(
+        "DJANGO_ALLOWED_HOSTS",
+        "localhost,127.0.0.1"
+    ).split(",")
+    if host.strip()
+]
 
 
 # ---------------------------------------------------------------------------
@@ -41,6 +48,7 @@ ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.
 # ---------------------------------------------------------------------------
 EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.sendgrid.net")
 EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "10"))
 EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True").lower() == "true"
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "apikey")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
