@@ -30,15 +30,26 @@ def send_recovery_pin_email(recipient_email: str, pin: str) -> None:
     if not isinstance(pin, str) or not pin.strip():
         raise ValueError("El PIN de recuperación es obligatorio.")
 
-    if not settings.EMAIL_HOST_PASSWORD or not settings.EMAIL_HOST_USER:
-        raise ImproperlyConfigured(
-            "La configuración SMTP está incompleta."
-        )
+    is_smtp_backend = (
+        settings.EMAIL_BACKEND
+        == "django.core.mail.backends.smtp.EmailBackend"
+    )
 
-    if not settings.DEFAULT_FROM_EMAIL:
-        raise ImproperlyConfigured(
-            "No se ha configurado el remitente del correo."
-        )
+    if is_smtp_backend:
+        if not settings.EMAIL_HOST_USER or not settings.EMAIL_HOST_PASSWORD:
+            raise ImproperlyConfigured(
+                "La configuración SMTP está incompleta."
+            )
+
+        if not settings.DEFAULT_FROM_EMAIL:
+            raise ImproperlyConfigured(
+                "No se ha configurado el remitente del correo."
+            )
+
+    from_email = (
+        settings.DEFAULT_FROM_EMAIL
+        or "SIGECI <no-reply@localhost>"
+    )
 
     subject = "SIGECI - Recuperación de cuenta"
     message = (
@@ -52,7 +63,7 @@ def send_recovery_pin_email(recipient_email: str, pin: str) -> None:
         sent_count = send_mail(
             subject=subject,
             message=message,
-            from_email=settings.DEFAULT_FROM_EMAIL,
+            from_email=from_email,
             recipient_list=[recipient_email],
             fail_silently=False,
         )

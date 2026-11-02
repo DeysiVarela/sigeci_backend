@@ -41,10 +41,16 @@ class RecoveryPinEmailTests(SimpleTestCase):
         with self.assertRaises(ValueError):
             send_recovery_pin_email("destinatario@example.com", "")
 
-    @override_settings(EMAIL_HOST_PASSWORD="")
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.smtp.EmailBackend",
+        EMAIL_HOST_PASSWORD="",
+    )
     def test_rejects_missing_smtp_credentials(self):
         with self.assertRaises(ImproperlyConfigured):
-            send_recovery_pin_email("destinatario@example.com", "123456")
+            send_recovery_pin_email(
+                "destinatario@example.com",
+                "123456",
+            )
 
     @patch(
         "notifications.services.send_mail",
