@@ -195,6 +195,7 @@ SIMPLE_JWT = {
 
 # CORS: origen del frontend (Vite)
 CORS_ALLOWED_ORIGINS = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:5173').split(',')
+CORS_ALLOW_CREDENTIALS = True
 
 # reCAPTCHA: la clave (RECAPTCHA_SECRET_KEY) la lee auth_api del entorno. El CAPTCHA es
 # obligatorio siempre, salvo que en DESARROLLO se ponga CAPTCHA_REQUIRED=False.
