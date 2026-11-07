@@ -6,6 +6,7 @@ from datetime import timedelta
 from unittest.mock import patch
 
 from django.conf import settings
+from django.core.cache import cache
 from django.utils import timezone
 
 from . import tests as base
@@ -59,6 +60,7 @@ class PinRulesTests(base.BaseCase):
     def test_resend_after_cooldown_invalidates_previous_pin(self):
         _, first = self.forgot()
         old = first.call_args.args[1]
+        cache.clear()  # simula que ya pasó el tiempo de espera
         PasswordResetPin.objects.update(
             created_at=timezone.now() - timedelta(seconds=settings.PASSWORD_RESET_RESEND_SECONDS + 1)
         )
