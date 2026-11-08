@@ -15,7 +15,11 @@ MATRIX = {
         "event": ["view", "create", "update", "delete", "active", "inactive"],
         "application": ["view", "create", "update", "delete", "active", "inactive", "download"],
     },
+    # MEMBER = miembro del comité científico: gestiona usuarios, salvo cuentas y rol de
+    # administrador (regla en users/views.py y users/serializers.py).
     "MEMBER": {
+        "user": ["view", "create", "update", "delete", "active", "inactive"],
+        "user_role": ["update"],
         "article": ["view", "download"],
         "event": ["view"],
         "application": ["view"],
