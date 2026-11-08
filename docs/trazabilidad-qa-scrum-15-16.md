@@ -22,7 +22,7 @@ Archivos: `accounts/tests.py` (T), `accounts/tests_qa.py` (Q), `accounts/tests_c
 | 02 | Validación de obligatorios, formatos y unicidad; sin cambios parciales | T `test_create_validations_and_unique_email`; Q `test_update_with_duplicate_email_is_rejected_and_not_persisted` | Auto |
 | 03 | Dos filtros (rol y estado), por separado y combinados; sin filtros lista lo permitido | T `UserCrudTests.test_list_pagination_and_filters` | Auto – filtros pendientes de confirmar con el PO |
 | 04 | Autenticación y autorización en el servidor según matriz | T `AuthTests.test_requires_token`, T `test_member_is_forbidden_even_calling_endpoint_directly`; Q `test_role_change_requires_explicit_permission` | Auto – **matriz pendiente de aprobación del PO** |
-| 05 | Eliminación según lo acordado, respetando integridad referencial | T `test_soft_delete_and_self_delete_blocked` (borrado lógico, 404 posterior, no puede entrar) | Auto – comportamiento pendiente de confirmar con el PO |
+| 05 | Eliminación según lo acordado, respetando integridad referencial | T `test_soft_delete_and_self_delete_blocked`; `tests_delete.py` (borrado lógico: fila conservada, desaparece de la API, no inicia sesión, token deja de servir, sin PIN de recuperación, correo reservado, referencias de auditoría intactas) | Auto – comportamiento pendiente de confirmar con el PO |
 | 06 | Sin contraseñas/hashes/PIN en respuestas; cambios de rol solo con autorización explícita | Q `test_responses_never_expose_secrets`, Q `test_role_change_requires_explicit_permission`, T `test_update_role_and_status` | Auto |
 | 07 | Evidencia de CRUD, uso individual y combinado de filtros, validación y rechazo sin permiso | Pruebas anteriores + capturas | Auto – falta adjuntar salida/capturas |
 

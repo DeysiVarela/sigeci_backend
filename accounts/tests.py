@@ -87,13 +87,14 @@ class UserCrudTests(BaseCase):
         self.assertEqual(self.client.get("/api/users/?active=false").data["count"], 1)
         self.assertEqual(self.client.get(f"/api/users/?profile={member_id}&active=false").data["count"], 1)
 
-    def test_delete_removes_user_and_self_delete_blocked(self):
+    def test_soft_delete_and_self_delete_blocked(self):
         self.auth("admin@t.co")
-        pk = self.member.pk
         self.assertEqual(self.client.delete(f"/api/users/{self.admin.pk}/").status_code, 400)
-        self.assertEqual(self.client.delete(f"/api/users/{pk}/").status_code, 204)
-        self.assertFalse(User.objects.filter(pk=pk).exists())  # borrado físico
-        self.assertEqual(self.client.get(f"/api/users/{pk}/").status_code, 404)
+        self.assertEqual(self.client.delete(f"/api/users/{self.member.pk}/").status_code, 204)
+        self.member.refresh_from_db()
+        self.assertTrue(self.member.user_delete)
+        self.assertFalse(self.member.user_active)
+        self.assertEqual(self.client.get(f"/api/users/{self.member.pk}/").status_code, 404)
         self.assertEqual(self.login("member@t.co").status_code, 401)
 
     def test_update_role_and_status(self):
