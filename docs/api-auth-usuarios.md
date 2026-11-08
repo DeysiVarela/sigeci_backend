@@ -18,6 +18,22 @@ Cuerpo: `{ "identifier": "correo", "password": "...", "captchaToken": "..." }`
 
 El CAPTCHA se valida con Google (`RECAPTCHA_SECRET_KEY`, misma verificación que `auth_api`) **antes** de revisar credenciales. Es obligatorio salvo `CAPTCHA_REQUIRED=False` en desarrollo; con `DEBUG` apagado no se puede desactivar.
 
+### `POST /api/auth/register/` – registro público (SCRUM-120)
+Público (no requiere token; funciona con o sin `/` final). Límite: 5/min por IP.
+Cuerpo: `{ "name", "lastname", "email", "password", "captchaToken" }`: los mismos datos que crear usuario, sin el rol, más el token del CAPTCHA. La confirmación de contraseña se valida en la pantalla; cualquier otro campo (incluido `confirmPassword`) se ignora.
+**El rol no se elige: siempre se crea con rol `AUTHOR`.** Si la petición trae un valor en `profile`, `profile_id`, `profile_name`, `role`, `role_id`, `rol`, `perfil` o `user_role`, se rechaza con `400` (nunca se usa).
+
+| Código | Respuesta |
+|---|---|
+| 201 | `{ "detail": "Cuenta creada. Ya puedes iniciar sesión.", "user": { id, name, lastname, email, provider, profile, profile_name, active, created_at, updated_at } }` (no devuelve tokens: el usuario inicia sesión después) |
+| 400 | Errores por campo (nombre/apellido vacíos o > 60, correo inválido, contraseña que no cumple las reglas, rol indicado) o `{"detail": "Verificación CAPTCHA inválida o vencida."}` |
+| 409 | `{"detail": "Este correo ya está registrado.", "email": [...]}` (sin distinguir mayúsculas; no se duplica ni se modifica la cuenta existente) |
+| 503 | CAPTCHA obligatorio sin clave configurada, o no existe el perfil `AUTHOR` (ejecutar `seed_accounts`) |
+
+El correo de una cuenta eliminada (borrado lógico) sigue contando como registrado.
+Orden de las comprobaciones: validar datos → CAPTCHA → correo duplicado → crear. Un error de formulario no consume el token de CAPTCHA, y un correo registrado solo se revela a quien pasó el CAPTCHA.
+La contraseña se cifra con el hash de Django (**PBKDF2-SHA256**, el mismo de todo el sistema) y nunca se devuelve ni se registra en claro.
+
 ### `POST /api/auth/refresh/`
 `{ "refresh": "..." }` → `200 { access }` · `401 {"detail": "Token inválido o vencido."}`.
 Vigencias: access 30 min, refresh 1 día.

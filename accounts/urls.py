@@ -4,6 +4,7 @@ from . import views
 
 urlpatterns = [
     re_path(r"^auth/login/?$", views.LoginView.as_view()),  # /api/auth/login y /api/auth/login/
+    re_path(r"^auth/register/?$", views.RegisterView.as_view()),  # público: /api/auth/register/
     path("auth/refresh/", views.RefreshView.as_view()),
     path("auth/me/", views.MeView.as_view()),
     path("auth/password/forgot/", views.ForgotPasswordView.as_view()),
