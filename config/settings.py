@@ -33,10 +33,13 @@ ALLOWED_HOSTS = [
     host.strip()
     for host in os.getenv(
         "DJANGO_ALLOWED_HOSTS",
-        "localhost,127.0.0.1"
+        "localhost,127.0.0.1,*"
     ).split(",")
     if host.strip()
 ]
+# Si está en Render o no se definió, asegurar comodín y sufijo de Render
+if "*" not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.extend([".onrender.com", "localhost", "127.0.0.1"])
 
 
 # ---------------------------------------------------------------------------
