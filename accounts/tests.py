@@ -23,7 +23,7 @@ def make_user(email, profile_name, active=True, password=PWD):
     return u
 
 
-@override_settings(CAPTCHA_REQUIRED=False)  # los tests de captcha lo activan explícitamente
+@override_settings(CAPTCHA_REQUIRED=False, REGISTER_RATE="1000/min")  # los tests de captcha lo activan explícitamente
 class BaseCase(APITestCase):
     def setUp(self):
         cache.clear()

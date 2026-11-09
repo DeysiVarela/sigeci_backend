@@ -32,6 +32,9 @@ Decisión: ☐ Aprobada ☐ Con cambios: ____________________
 | Comité científico (rol MEMBER) | gestiona usuarios; no crea ni modifica administradores ni asigna el rol ADMIN | ☐ |
 | Consulta y edición propia | pendiente: la regla del PO dice que todos consultan y cada usuario edita sus propios datos; hoy solo ADMIN y MEMBER (comité) consultan | ☐ |
 | Espera de reenvío del PIN | 60 s por correo, visible para el usuario (`429` con `retry_after`) | ☐ |
+| Registro público (SCRUM-120) | rol AUTHOR siempre; un rol en la petición se rechaza (400); correo repetido responde 409 con mensaje claro (revela que el correo existe) | ☐ |
+| Hash de contraseñas (CA-07 de SCRUM-120) | el criterio dice bcrypt o argon2; el equipo decidió mantener el hash de Django (PBKDF2-SHA256) para todo el sistema | ☐ |
+| Verificación de correo | el registro NO exige confirmar el correo: la cuenta queda activa al crearse | ☐ |
 | Vigencia de sesión | access 30 min, refresh 1 día | ☐ |
 
 Aprobado por: ______________________  Fecha: ____________
