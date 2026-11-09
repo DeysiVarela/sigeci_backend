@@ -46,6 +46,7 @@ class UserSerializer(serializers.ModelSerializer):
     email = serializers.CharField(source="user_email", read_only=True)
     provider = serializers.CharField(source="user_provider", read_only=True)
     active = serializers.BooleanField(source="user_active", read_only=True)
+    user_seed_token = serializers.CharField(read_only=True)
     profile = serializers.IntegerField(source="profile_id", read_only=True)
     profile_name = serializers.CharField(source="profile.profile_name", read_only=True)
     created_at = serializers.DateTimeField(source="user_created_at", read_only=True)
@@ -55,7 +56,7 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             "id", "name", "lastname", "email", "provider",
-            "profile", "profile_name", "active", "created_at", "updated_at",
+            "profile", "profile_name", "active", "user_seed_token", "created_at", "updated_at",
         ]
 
 

@@ -1,0 +1,58 @@
+info:
+  name: /article
+  type: http
+  seq: 4
+
+http:
+  method: GET
+  url: "{{url}}/article"
+  headers:
+    - name: Authorization
+      value: "{{token}}"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+examples:
+  - name: not permission
+    request:
+      url: "{{url}}/article"
+      method: GET
+      headers:
+        - name: Authorization
+          value: "{{token}}"
+    response:
+      status: 403
+      statusText: Forbidden
+      headers:
+        - name: date
+          value: Mon, 09 Nov 2026 02:47:39 GMT
+        - name: server
+          value: WSGIServer/0.2 CPython/3.14.6
+        - name: content-type
+          value: application/json
+        - name: x-frame-options
+          value: DENY
+        - name: content-length
+          value: "83"
+        - name: x-content-type-options
+          value: nosniff
+        - name: referrer-policy
+          value: same-origin
+        - name: cross-origin-opener-policy
+          value: same-origin
+        - name: vary
+          value: origin
+      body:
+        type: json
+        data: |-
+          {
+            "message": "0000",
+            "success": false,
+            "internMessage": "you don't have permission"
+          }

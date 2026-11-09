@@ -74,6 +74,7 @@ class User(models.Model):
     profile = models.ForeignKey(
         Profile, on_delete=models.PROTECT, db_column="profile_id", related_name="users"
     )
+    user_seed_token = models.CharField(max_length=120, null=True, blank=True)
     user_active = models.BooleanField(default=True)
     user_delete = models.BooleanField(default=False)
 
@@ -87,7 +88,7 @@ class User(models.Model):
         "self", null=True, blank=True, on_delete=models.SET_NULL,
         db_column="user_updated_by", related_name="+",
     )
-    user_updated_at = models.DateTimeField(auto_now=True)
+    user_updated_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = "users"

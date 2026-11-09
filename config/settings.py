@@ -76,6 +76,9 @@ INSTALLED_APPS = [
     'accounts',
     'auth_api',
     'notifications',
+    'Login',
+    'article',
+    'dashboard',
 ]
 
 MIDDLEWARE = [
