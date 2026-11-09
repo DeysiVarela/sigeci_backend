@@ -26,6 +26,7 @@ Vigencias: access 30 min, refresh 1 día.
 → `200` mismo objeto `user` del login (con `permissions`).
 
 ### `POST /api/auth/password/forgot/` – paso 1
+**Espera entre solicitudes: 60 s por correo** (se aplica igual exista o no la cuenta, y sin distinguir mayúsculas). Dentro de ese tiempo responde `429 {"detail": "Espera N segundos para solicitar un nuevo PIN.", "retry_after": N}` con la cabecera `Retry-After`, y no se envía nada. El PIN solo se genera y envía si el correo pertenece a una cuenta registrada y activa.
 `{ "email": "..." }` → **siempre** `200 {"detail": "Si el correo corresponde a una cuenta activa, recibirás un PIN para restablecer tu contraseña."}`,
 exista o no la cuenta, esté o no activa y aunque falle el envío (no permite distinguir correos registrados). `400` solo por formato de correo inválido. Límite: 5/min.
 
@@ -45,7 +46,7 @@ exista o no la cuenta, esté o no activa y aunque falle el envío (no permite di
 | Longitud | 6 dígitos |
 | Vigencia | 10 minutos |
 | Intentos fallidos por PIN | 5 (luego se invalida) |
-| Reenvío | 1 solicitud cada 60 s por cuenta; un PIN nuevo invalida el anterior |
+| Reenvío | 1 solicitud cada 60 s por correo (`429` con `retry_after` si se repite antes); un PIN nuevo invalida el anterior |
 | Uso | Un solo uso; se guarda hasheado |
 | Contraseña | ≥ 8 caracteres, mayúscula, minúscula, número y carácter especial (`@$!%*?&._-#^()+=`) + validadores de Django (longitud mínima, contraseñas comunes, solo numéricas) |
 | Envío | `notifications.send_recovery_pin_email` (SendGrid); en desarrollo sin credenciales el correo se imprime en la consola del servidor |
@@ -58,6 +59,7 @@ Query: `page` (1), `page_size` (10, máx. 100), `profile` (id numérico de rol),
 `200 { count, next, previous, results: [user] }` · `400` si `profile` no es numérico o `active` no es `true`/`false`.
 
 ### `POST /api/users/` — permiso `user:create`
+Un usuario que no es ADMIN (p. ej. MEMBER, el comité científico) no puede crear usuarios con rol ADMIN (`403`).
 `{ name (≤60), lastname (≤60), email (≤120, único sin distinguir mayúsculas), password, profile (id de rol activo), active (opcional, true) }`
 `201` → `user` (sin contraseña) · `400` errores por campo; si falla no se persiste nada.
 
@@ -67,12 +69,13 @@ Query: `page` (1), `page_size` (10, máx. 100), `profile` (id numérico de rol),
 ### `PATCH|PUT /api/users/{id}/` — permiso `user:update`
 Campos: `name`, `lastname`, `email`, `profile`, `active`. La contraseña no se edita aquí (se usa la recuperación).
 - Cambiar `profile` exige además `user_role:update`; cambiar `active` exige `user:active` / `user:inactive`.
+- Solo un ADMIN puede asignar el rol ADMIN, y solo un ADMIN puede modificar cuentas de administradores (`403`).
 - No se puede cambiar el propio rol ni desactivarse a sí mismo, ni quitar el rol o desactivar al único ADMIN activo (`400`).
 - `200 user` · `403` sin autorización · `400` validación (sin cambios parciales).
 
 ### `DELETE /api/users/{id}/` — permiso `user:delete`
-**Borrado lógico**: `user_delete = true` y `user_active = false`. No se elimina la fila, por lo que se respeta la integridad referencial (p. ej. `article_reviewer.user_id`). El usuario deja de poder iniciar sesión.
-`204` · `400` si es la propia cuenta o el único ADMIN activo · `404`.
+**Borrado lógico**: `user_delete = true` y `user_active = false`. No se elimina la fila, por lo que se respeta la integridad referencial (p. ej. `article_reviewer.user_id`). El usuario pierde el acceso: no puede iniciar sesión, sus tokens dejan de servir, no recibe PIN de recuperación y desaparece de todos los endpoints. Su correo sigue reservado.
+`204` · `400` si es la propia cuenta o el único ADMIN activo · `403` si la cuenta es de un administrador y quien elimina no lo es · `404`.
 
 ### `GET /api/profiles/` — permiso `user:view`
 `200 [ { id, name } ]` (roles activos, para los selectores).
@@ -83,7 +86,7 @@ Recursos de este alcance: `user` y `user_role`. Los de `article`, `event` y `app
 | Perfil | user | user_role | article | event | application |
 |---|---|---|---|---|---|
 | ADMIN | view, create, update, delete, active, inactive | update | todos | view, create, update, delete, active, inactive | todos |
-| MEMBER | — | — | view, download | view | view |
+| MEMBER (comité científico) | view, create, update, delete, active, inactive (no sobre administradores ni rol ADMIN) | update | view, download | view | view |
 | AUTHOR | — | — | view, create, update, download | view | view, create, update |
 
 La autorización se valida en el servidor en cada endpoint (`HasProfilePermission`); los permisos que el frontend lee de `/auth/me/` son solo informativos.
