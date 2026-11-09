@@ -8,12 +8,12 @@ from datetime import timedelta
 from django.conf import settings
 from django.core.cache import cache
 from django.contrib.auth.hashers import check_password, make_password
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.throttling import ScopedRateThrottle
+from rest_framework.throttling import AnonRateThrottle, ScopedRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -21,14 +21,16 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from notifications.services import PinEmailError, send_recovery_pin_email
 
 from .captcha import captcha_configured, captcha_required, verify_captcha
-from .models import PasswordResetPin, User
+from .models import PasswordResetPin, Profile, User
 from .serializers import (
-    ForgotPasswordSerializer, LoginSerializer, RefreshSerializer, ResetPasswordSerializer,
+    ForgotPasswordSerializer, LoginSerializer, RefreshSerializer, RegisterSerializer, ResetPasswordSerializer,
 )
 from .users.serializers import UserSerializer
 
 logger = logging.getLogger(__name__)
 
+AUTHOR_PROFILE = "AUTHOR"  # único rol que se asigna en el registro público
+EMAIL_TAKEN = {"detail": "Este correo ya está registrado.", "email": ["Este correo ya está registrado."]}
 INVALID_CREDENTIALS = {"detail": "Credenciales inválidas."}
 INVALID_PIN = {"detail": "PIN inválido, vencido o ya utilizado."}
 FORGOT_GENERIC = {
@@ -118,6 +120,75 @@ class MeView(APIView):
 
     def get(self, request):
         return Response(_user_payload(request.user))
+
+
+class RegisterRateThrottle(AnonRateThrottle):
+    """Límite de registros por IP. Configurable con REGISTER_RATE en settings (por defecto 5/min)."""
+
+    scope = "register"
+
+    def get_rate(self):
+        return getattr(settings, "REGISTER_RATE", "5/min")
+
+
+class RegisterView(APIView):
+    """
+    POST /api/auth/register/  (público)
+    Crea una cuenta con rol AUTHOR, siempre. Orden: validar datos -> CAPTCHA -> correo duplicado -> crear.
+    El CAPTCHA se consume solo si los datos son válidos (un error de formulario no lo gasta).
+    """
+
+    authentication_classes = []
+    permission_classes = [AllowAny]
+    throttle_classes = [RegisterRateThrottle]
+
+    def post(self, request):
+        ser = RegisterSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        data = ser.validated_data
+
+        if captcha_required() and not captcha_configured():
+            logger.error("CAPTCHA obligatorio pero RECAPTCHA_SECRET_KEY no está configurada: registro deshabilitado.")
+            return Response(
+                {"detail": "El servicio de registro no está disponible."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        if not verify_captcha(data.get("captchaToken"), request.META.get("REMOTE_ADDR")):
+            return Response(
+                {"detail": "Verificación CAPTCHA inválida o vencida."}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        author = Profile.objects.filter(
+            profile_name=AUTHOR_PROFILE, profile_active=True, profile_delete=False
+        ).first()
+        if author is None:
+            logger.error("Registro público: no existe el perfil AUTHOR (ejecutar seed_accounts).")
+            return Response(
+                {"detail": "El registro no está disponible en este momento."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        if User.objects.filter(user_email__iexact=data["email"]).exists():
+            return Response(EMAIL_TAKEN, status=status.HTTP_409_CONFLICT)
+
+        user = User(
+            user_name=data["name"],
+            user_lastname=data["lastname"],
+            user_email=data["email"],
+            user_provider=User.PROVIDER_ACCOUNT,
+            profile=author,  # forzado: nunca viene de la petición
+        )
+        user.set_password(data["password"])  # hash de Django (PBKDF2); nunca se guarda ni se registra en claro
+        try:
+            with transaction.atomic():
+                user.save()
+        except IntegrityError:  # dos registros simultáneos con el mismo correo
+            return Response(EMAIL_TAKEN, status=status.HTTP_409_CONFLICT)
+
+        return Response(
+            {"detail": "Cuenta creada. Ya puedes iniciar sesión.", "user": UserSerializer(user).data},
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class ForgotPasswordView(APIView):

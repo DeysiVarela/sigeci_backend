@@ -1,4 +1,4 @@
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
 from rest_framework import status, viewsets
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.generics import ListAPIView
@@ -27,7 +27,7 @@ class UserViewSet(viewsets.ModelViewSet):
     POST   /api/users/
     GET    /api/users/{id}/
     PATCH  /api/users/{id}/
-    DELETE /api/users/{id}/   -> borrado físico
+    DELETE /api/users/{id}/   -> borrado lógico
     """
 
     permission_classes = [IsAuthenticated, HasProfilePermission]
@@ -64,25 +64,19 @@ class UserViewSet(viewsets.ModelViewSet):
     def _respond_with_read_serializer(self, instance, status_code):
         return Response(UserSerializer(instance).data, status=status_code)
 
-    def _ensure_can_manage(self, request, target):
-        """Quien no es administrador no puede modificar ni eliminar cuentas de administradores."""
-        if is_admin(target) and not is_admin(request.user):
-            raise PermissionDenied("Solo un administrador puede modificar o eliminar cuentas de administradores.")
-
     def create(self, request, *args, **kwargs):
         ser = self.get_serializer(data=request.data)
         ser.is_valid(raise_exception=True)
-        
-        # CORRECCIÓN: Evita que un MEMBER cree un usuario con perfil de Administrador
-        target_profile = ser.validated_data.get("profile")
-        if target_profile and target_profile.profile_name == "ADMIN" and not is_admin(request.user):
-            raise PermissionDenied("Solo un administrador puede crear usuarios con el rol de administrador.")
-
         try:
             user = ser.save()
         except IntegrityError:  # carrera entre dos altas con el mismo correo
             raise ValidationError({"email": "Ya existe un usuario con este correo."})
         return self._respond_with_read_serializer(user, status.HTTP_201_CREATED)
+
+    def _ensure_can_manage(self, request, target):
+        """Quien no es administrador no puede modificar ni eliminar cuentas de administradores."""
+        if is_admin(target) and not is_admin(request.user):
+            raise PermissionDenied("Solo un administrador puede modificar o eliminar cuentas de administradores.")
 
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop("partial", False)
@@ -90,12 +84,6 @@ class UserViewSet(viewsets.ModelViewSet):
         self._ensure_can_manage(request, instance)
         ser = self.get_serializer(instance, data=request.data, partial=partial)
         ser.is_valid(raise_exception=True)
-        
-        # CORRECCIÓN EXTRA: Evita que un MEMBER cambie el rol de alguien a Administrador en un update
-        target_profile = ser.validated_data.get("profile")
-        if target_profile and target_profile.profile_name == "ADMIN" and not is_admin(request.user):
-            raise PermissionDenied("Solo un administrador puede asignar el rol de administrador.")
-
         user = ser.save()
         return self._respond_with_read_serializer(user, status.HTTP_200_OK)
 
@@ -106,14 +94,12 @@ class UserViewSet(viewsets.ModelViewSet):
             raise ValidationError({"detail": "No puedes eliminar tu propia cuenta."})
         if is_last_admin(user):
             raise ValidationError({"detail": "No se puede eliminar al único administrador activo."})
-        try:
-            with transaction.atomic():
-                user.delete()
-        except IntegrityError:
-            return Response(
-                {"detail": "No se puede eliminar el usuario porque tiene registros asociados. Desactívalo en su lugar."},
-                status=status.HTTP_409_CONFLICT,
-            )
+        # Borrado lógico: el usuario pierde el acceso y desaparece de la API, pero su registro se
+        # conserva (integridad referencial con otras tablas, p. ej. article_reviewer).
+        user.user_delete = True
+        user.user_active = False
+        user.user_updated_by = request.user
+        user.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 

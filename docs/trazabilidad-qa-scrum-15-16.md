@@ -22,9 +22,22 @@ Archivos: `accounts/tests.py` (T), `accounts/tests_qa.py` (Q), `accounts/tests_c
 | 02 | Validación de obligatorios, formatos y unicidad; sin cambios parciales | T `test_create_validations_and_unique_email`; Q `test_update_with_duplicate_email_is_rejected_and_not_persisted` | Auto |
 | 03 | Dos filtros (rol y estado), por separado y combinados; sin filtros lista lo permitido | T `UserCrudTests.test_list_pagination_and_filters` | Auto – filtros pendientes de confirmar con el PO |
 | 04 | Autenticación y autorización en el servidor según matriz | T `AuthTests.test_requires_token`, T `test_member_is_forbidden_even_calling_endpoint_directly`; Q `test_role_change_requires_explicit_permission` | Auto – **matriz pendiente de aprobación del PO** |
-| 05 | Eliminación según lo acordado, respetando integridad referencial | T `test_soft_delete_and_self_delete_blocked` (borrado lógico, 404 posterior, no puede entrar) | Auto – comportamiento pendiente de confirmar con el PO |
+| 05 | Eliminación según lo acordado, respetando integridad referencial | T `test_soft_delete_and_self_delete_blocked`; `tests_delete.py` (borrado lógico: fila conservada, desaparece de la API, no inicia sesión, token deja de servir, sin PIN de recuperación, correo reservado, referencias de auditoría intactas) | Auto – comportamiento pendiente de confirmar con el PO |
 | 06 | Sin contraseñas/hashes/PIN en respuestas; cambios de rol solo con autorización explícita | Q `test_responses_never_expose_secrets`, Q `test_role_change_requires_explicit_permission`, T `test_update_role_and_status` | Auto |
 | 07 | Evidencia de CRUD, uso individual y combinado de filtros, validación y rechazo sin permiso | Pruebas anteriores + capturas | Auto – falta adjuntar salida/capturas |
+
+## SCRUM-120 – Registro público desde el login (rol Autor)
+Archivo de pruebas: `accounts/tests_register.py`. Los CA-01 a CA-03 y CA-08 son del frontend.
+| CA | Criterio | Pruebas / evidencia | Estado |
+|---|---|---|---|
+| 01 | Enlace "¿No tienes cuenta? Regístrate" y regreso al login | Frontend | Pendiente (frontend) |
+| 02 | Formulario con nombres, apellidos, correo, contraseña, confirmación y CAPTCHA | Frontend; el backend exige nombre, apellido, correo y clave: `test_missing_fields_are_required` (la confirmación se valida en la pantalla) | Pendiente (frontend) |
+| 03 | Validación en el cliente | Frontend (el servidor revalida: ver CA-04) | Pendiente (frontend) |
+| 04 | `POST /api/auth/register/` público; revalida datos; verifica CAPTCHA con SCRUM-14 | `test_creates_an_author_account`, `test_is_public_even_with_a_bad_authorization_header`, `test_validation_errors_return_400_and_persist_nothing`, `RegisterCaptchaTests` | Auto (CAPTCHA simulado; falta prueba con Google real) |
+| 05 | Rol AUTHOR forzado; un rol en la petición se rechaza | `test_role_or_profile_fields_are_rejected`, `test_empty_role_fields_are_ignored_and_the_role_is_still_author`, `test_new_author_has_no_user_management_permissions` | Auto |
+| 06 | Correo ya registrado: 409 claro, sin duplicar | `test_duplicate_email_returns_409_without_duplicating`, `test_duplicate_email_ignores_case_and_does_not_touch_the_existing_account`, `test_concurrent_duplicate_is_also_409` | Auto |
+| 07 | Contraseña con hash seguro, nunca en claro | `test_password_is_hashed_with_django_pbkdf2_and_never_returned` | Auto – **desviación acordada por el equipo:** el criterio nombra bcrypt/argon2 y se usa el hash de Django (PBKDF2-SHA256); pendiente de confirmar con el PO/QA |
+| 08 | Mensaje de cuenta creada y redirección al login | El backend devuelve el mensaje; la redirección es del frontend | Pendiente (frontend) |
 
 ## Evidencia a adjuntar (siguiendo la numeración E0x que ya usa `docs/`)
 1. Salida de pruebas: `python manage.py test accounts notifications auth_api -v 2` (sin `.env` ni claves).
