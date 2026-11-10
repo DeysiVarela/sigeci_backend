@@ -2,5 +2,11 @@ name: Sigesi
 variables:
   - name: url
     value: http://localhost:8000/api/v1
+    description: ""
   - name: token
     value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzk0MTkyNjQxLCJpYXQiOjE3OTQxOTI0MDEsImp0aSI6Ijg2YzJmYmI0NTM5OTQzZWRhNGMzZmJjYzRiN2ZlM2Y1IiwidXNlcl9pZCI6OCwicHJvZmlsZV9pZCI6MSwidXNlcl9zZWVkX3Rva2VuIjoiZmIwZjgxNzYtYjM3Yi00YTUzLWE0OWItOGMwZWRiZjUyYTMwIn0.h4AfkEYFSQvK3ByZmS9F_CjfO8jeUBPYgPT7LYheMJc
+    description: ""
+  - name: url
+    value: https://sigeci-backend.onrender.com/api/v1
+    disabled: true
+    description: ""
