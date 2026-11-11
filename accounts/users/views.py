@@ -1,15 +1,20 @@
-from django.db import IntegrityError
+from django.conf import settings
+from django.db import IntegrityError, transaction
+from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.generics import ListAPIView
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import BasePermission, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import UserRateThrottle
+from rest_framework.views import APIView
 
 from ..models import Profile, User
 from ..permissions import HasProfilePermission
 from .serializers import (
-    ProfileSerializer, UserCreateSerializer, UserSerializer, UserUpdateSerializer, is_admin, is_last_admin,
+    ChangePasswordSerializer, MyProfileUpdateSerializer, ProfileSerializer, UserCreateSerializer,
+    UserSerializer, UserUpdateSerializer, is_admin, is_last_admin,
 )
 
 # --------------------------------------------------------------------------- #
@@ -116,3 +121,71 @@ class ProfileListView(ListAPIView):
     serializer_class = ProfileSerializer
     pagination_class = None
     queryset = Profile.objects.filter(profile_active=True, profile_delete=False).order_by("profile_id")
+
+
+# --------------------------------------------------------------------------- #
+# SCRUM-125: mi perfil (solo operan sobre el usuario de la sesión)
+# --------------------------------------------------------------------------- #
+class PasswordChangeRateThrottle(UserRateThrottle):
+    """Límite de intentos por usuario. Configurable con PASSWORD_CHANGE_RATE (por defecto 5/min)."""
+
+    scope = "password_change"
+
+    def get_rate(self):
+        return getattr(settings, "PASSWORD_CHANGE_RATE", "5/min")
+
+
+def _my_payload(user):
+    """Misma forma que /api/auth/me/ (con `permissions`): el frontend puede refrescar la sesión con la respuesta."""
+    data = dict(UserSerializer(user).data)
+    data["permissions"] = user.permissions_map()
+    return data
+
+
+class MyProfileView(APIView):
+    """
+    GET   /api/users/me   -> mis datos
+    PATCH /api/users/me   -> actualizo mi nombre, apellido y correo
+
+    No recibe ningún id y no exige permisos de la matriz: cada usuario gestiona su propio perfil.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response(_my_payload(request.user))
+
+    def patch(self, request):
+        ser = MyProfileUpdateSerializer(request.user, data=request.data, partial=True)
+        ser.is_valid(raise_exception=True)
+        try:
+            with transaction.atomic():
+                user = ser.save()
+        except IntegrityError:  # dos cambios simultáneos al mismo correo
+            raise ValidationError({"email": ["Ya existe un usuario con este correo."]})
+        return Response(_my_payload(user))
+
+
+class MyPasswordView(APIView):
+    """PUT /api/users/me/password/ -> cambio mi contraseña (pide la actual)."""
+
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [PasswordChangeRateThrottle]
+
+    def put(self, request):
+        user = request.user
+        if user.user_provider != User.PROVIDER_ACCOUNT:
+            return Response(
+                {"detail": "Tu cuenta no usa una contraseña propia; no se puede cambiar aquí."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        ser = ChangePasswordSerializer(data=request.data, context={"request": request})
+        ser.is_valid(raise_exception=True)
+
+        user.set_password(ser.validated_data["newPassword"])
+        user.user_updated_by = user
+        with transaction.atomic():
+            user.save(update_fields=["user_password", "user_updated_by", "user_updated_at"])
+            # Un PIN de recuperación pedido antes del cambio ya no debe servir
+            user.reset_pins.filter(used_at__isnull=True).update(used_at=timezone.now())
+        return Response({"detail": "Contraseña actualizada."})

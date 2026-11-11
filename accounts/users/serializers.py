@@ -164,3 +164,57 @@ class UserUpdateSerializer(_UserWriteBase):
         instance.save()
         return instance
 
+
+
+# --------------------------------------------------------------------------- #
+# SCRUM-125: mi perfil (solo el usuario de la sesión)
+# --------------------------------------------------------------------------- #
+class MyProfileUpdateSerializer(serializers.ModelSerializer):
+    """
+    Lo que cada usuario puede cambiar de su propio perfil. El rol, el estado, el proveedor y la
+    contraseña NO son campos: lo que llegue en esas claves se descarta.
+    """
+
+    name = serializers.CharField(source="user_name", max_length=60)
+    lastname = serializers.CharField(source="user_lastname", max_length=60)
+    email = serializers.EmailField(source="user_email", max_length=120)
+
+    class Meta:
+        model = User
+        fields = ["name", "lastname", "email"]
+
+    def validate_name(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("Este campo es obligatorio.")
+        return value
+
+    validate_lastname = validate_name
+
+    def validate_email(self, value):
+        value = value.strip().lower()
+        if User.objects.filter(user_email__iexact=value).exclude(pk=self.instance.pk).exists():
+            raise serializers.ValidationError("Ya existe un usuario con este correo.")
+        return value
+
+    def update(self, instance, validated_data):
+        for field, value in validated_data.items():
+            setattr(instance, field, value)
+        instance.user_updated_by = instance  # lo actualizó el propio usuario
+        instance.save()
+        return instance
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    """La confirmación de la nueva contraseña se valida en la pantalla; si llega `confirmPassword`, se ignora."""
+
+    currentPassword = serializers.CharField(write_only=True, trim_whitespace=False)
+    newPassword = serializers.CharField(write_only=True, trim_whitespace=False, validators=[validate_strong_password])
+
+    def validate(self, attrs):
+        user = self.context["request"].user
+        if not user.check_password(attrs["currentPassword"]):
+            raise serializers.ValidationError({"currentPassword": "La contraseña actual no es correcta."})
+        if attrs["currentPassword"] == attrs["newPassword"]:
+            raise serializers.ValidationError({"newPassword": "La nueva contraseña debe ser diferente a la actual."})
+        return attrs
