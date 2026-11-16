@@ -63,8 +63,9 @@ class Command(BaseCommand):
                 raise CommandError(str(exc))
             admin = User(
                 user_name=opts["admin_name"], user_lastname=opts["admin_lastname"],
-                user_email=email.lower(), profile=Profile.objects.get(profile_name="ADMIN"),
+                user_email=email.lower()
             )
             admin.set_password(password)
             admin.save()
+            admin.profiles.add(Profile.objects.get(profile_name="ADMIN"))
             self.stdout.write(self.style.SUCCESS(f"Administrador {email} creado."))

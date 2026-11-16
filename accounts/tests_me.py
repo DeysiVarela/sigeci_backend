@@ -26,7 +26,7 @@ class MyProfileTests(base.BaseCase):
             r = self.client.get(url)
             self.assertEqual(r.status_code, 200, url)
             self.assertEqual(r.data["email"], "autor@t.co")
-            self.assertEqual(r.data["profile_name"], "AUTHOR")
+            self.assertEqual(r.data["profiles"][0]["name"], "AUTHOR")  # <--- NUEVO
         body = r.content.decode().lower()
         self.assertNotIn("password", body)
         self.assertNotIn("pbkdf2", body)
@@ -94,14 +94,15 @@ class MyProfileTests(base.BaseCase):
     def test_patch_cannot_change_role_status_provider_or_password(self):
         admin_id = Profile.objects.get(profile_name="ADMIN").pk
         r = self.patch_me({
-            "name": "Ok", "profile": admin_id, "profile_name": "ADMIN", "role": "ADMIN", "rol": "ADMIN",
+            "name": "Ok", "profile": admin_id, "profiles": [admin_id], "profile_name": "ADMIN",  # <--- NUEVO (también se descarta "profiles")
+             "role": "ADMIN", "rol": "ADMIN",
             "perfil": "ADMIN", "active": False, "user_active": False, "provider": "GMAIL",
             "password": "Hacker.1234", "user_password": "x",
         })
         self.assertEqual(r.status_code, 200)  # lo permitido se aplica; lo demás se descarta
         self.me.refresh_from_db()
         self.assertEqual(self.me.user_name, "Ok")
-        self.assertEqual(self.me.profile.profile_name, "AUTHOR")
+        self.assertEqual(list(self.me.profiles.values_list("profile_name", flat=True)), ["AUTHOR"])  # <--- NUEVO
         self.assertTrue(self.me.user_active)
         self.assertEqual(self.me.user_provider, "ACCOUNT")
         self.assertTrue(self.me.check_password(base.PWD))
