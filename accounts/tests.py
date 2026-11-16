@@ -16,10 +16,10 @@ PWD = "Clave.Segura1"
 
 
 def make_user(email, profile_name, active=True, password=PWD):
-    u = User(user_name="N", user_lastname="L", user_email=email,
-             profile=Profile.objects.get(profile_name=profile_name), user_active=active)
+    u = User(user_name="N", user_lastname="L", user_email=email, user_active=active)
     u.set_password(password)
     u.save()
+    u.profiles.add(Profile.objects.get(profile_name=profile_name))  # NUEVO: asignación M2M tras el save
     return u
 
 
@@ -66,7 +66,7 @@ class UserCrudTests(BaseCase):
     def test_create_validations_and_unique_email(self):
         self.auth("admin@t.co")
         pid = Profile.objects.get(profile_name="AUTHOR").pk
-        body = {"name": "Ana", "lastname": "Paz", "email": "ana@t.co", "password": PWD, "profile": pid}
+        body = {"name": "Ana", "lastname": "Paz", "email": "ana@t.co", "password": PWD, "profiles": [pid]}  # NUEVO
         r = self.client.post("/api/users/", body, format="json")
         self.assertEqual(r.status_code, 201)
         self.assertNotIn("password", r.data)
@@ -100,9 +100,9 @@ class UserCrudTests(BaseCase):
     def test_update_role_and_status(self):
         self.auth("admin@t.co")
         author = Profile.objects.get(profile_name="AUTHOR").pk
-        r = self.client.patch(f"/api/users/{self.member.pk}/", {"profile": author, "active": False}, format="json")
+        r = self.client.patch(f"/api/users/{self.member.pk}/", {"profiles": [author], "active": False}, format="json")  # NUEVO
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.data["profile_name"], "AUTHOR")
+        self.assertEqual(r.data["profiles"][0]["name"], "AUTHOR")  # NUEVO
         self.assertFalse(r.data["active"])
 
 

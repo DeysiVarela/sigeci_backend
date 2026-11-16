@@ -43,7 +43,7 @@ class ResetPasswordSerializer(serializers.Serializer):
 
 
 # Campos con los que alguien podría intentar elegir su propio rol en el autorregistro
-ROLE_FIELDS = ("profile", "profile_id", "profile_name", "role", "role_id", "rol", "perfil", "user_role")
+ROLE_FIELDS = ("profile", "profiles", "profile_id", "profile_name", "role", "role_id", "rol", "perfil", "user_role")  # <--- NUEVO: se agregó "profiles"
 
 
 class RegisterSerializer(serializers.Serializer):

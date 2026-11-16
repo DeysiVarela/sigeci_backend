@@ -63,6 +63,6 @@ class SoftDeleteTests(base.BaseCase):
         self.delete()
         body = {
             "name": "Nuevo", "lastname": "Usuario", "email": "borrar@t.co", "password": base.PWD,
-            "profile": Profile.objects.get(profile_name="AUTHOR").pk,
+            "profiles": [Profile.objects.get(profile_name="AUTHOR").pk],  # <--- NUEVO
         }
         self.assertEqual(self.client.post("/api/users/", body, format="json").status_code, 400)

@@ -41,7 +41,7 @@ class UserViewSet(viewsets.ModelViewSet):
     http_method_names = ["get", "post", "patch", "put", "delete", "head", "options"]
 
     def get_queryset(self):
-        qs = User.objects.select_related("profile").filter(user_delete=False).order_by("user_id")
+        qs = User.objects.prefetch_related("profiles").filter(user_delete=False).order_by("user_id")
         if self.action != "list":
             return qs
 
@@ -51,7 +51,7 @@ class UserViewSet(viewsets.ModelViewSet):
         if profile not in (None, ""):
             if not profile.isdigit():
                 raise ValidationError({"profile": "Debe ser el id numérico de un rol."})
-            qs = qs.filter(profile_id=int(profile))
+            qs = qs.filter(profiles__profile_id=int(profile)).distinct()
         if active not in (None, ""):
             value = active.lower()
             if value not in ("true", "false"):
