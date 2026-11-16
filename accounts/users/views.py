@@ -14,7 +14,7 @@ from ..models import Profile, User
 from ..permissions import HasProfilePermission
 from .serializers import (
     ChangePasswordSerializer, MyProfileUpdateSerializer, ProfileSerializer, UserCreateSerializer,
-    UserSerializer, UserUpdateSerializer, is_admin, is_last_admin,
+    UserSerializer, UserUpdateSerializer, is_admin, is_last_admin, DeleteAccountSerializer, # NUEVO
 )
 
 # --------------------------------------------------------------------------- #
@@ -189,3 +189,35 @@ class MyPasswordView(APIView):
             # Un PIN de recuperación pedido antes del cambio ya no debe servir
             user.reset_pins.filter(used_at__isnull=True).update(used_at=timezone.now())
         return Response({"detail": "Contraseña actualizada."})
+
+class MyAccountDeleteView(APIView):
+    """
+    POST /api/users/me/delete/ -> desactiva mi propia cuenta (borrado lógico).
+    Requiere contraseña y valida que no sea el último administrador.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        
+        # 1. Validar la contraseña con el serializer
+        ser = DeleteAccountSerializer(data=request.data, context={"request": request})
+        ser.is_valid(raise_exception=True)
+
+        # 2. Verificar que no sea el último admin
+        if is_last_admin(user):
+            return Response(
+                {"detail": "No puedes eliminar tu cuenta porque eres el único administrador activo."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 3. Borrado lógico
+        user.user_delete = True
+        user.user_active = False
+        user.deactivation_reason = User.REASON_AUTO_ELIMINADO
+        user.save(update_fields=["user_delete", "user_active", "deactivation_reason", "user_updated_at"])
+
+        return Response(
+            {"detail": "Tu cuenta ha sido desactivada. Puedes solicitar la reactivación desde el login."},
+            status=status.HTTP_200_OK
+        )
