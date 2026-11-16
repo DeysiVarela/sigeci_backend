@@ -13,8 +13,8 @@ from rest_framework.views import APIView
 from ..models import Profile, User
 from ..permissions import HasProfilePermission
 from .serializers import (
-    ChangePasswordSerializer, MyProfileUpdateSerializer, ProfileSerializer, UserCreateSerializer,
-    UserSerializer, UserUpdateSerializer, is_admin, is_last_admin,
+    ChangePasswordSerializer, DeleteAccountSerializer, MyProfileUpdateSerializer, ProfileSerializer,
+    UserCreateSerializer, UserSerializer, UserUpdateSerializer, is_admin, is_last_admin,
 )
 
 # --------------------------------------------------------------------------- #
@@ -133,6 +133,14 @@ class PasswordChangeRateThrottle(UserRateThrottle):
 
     def get_rate(self):
         return getattr(settings, "PASSWORD_CHANGE_RATE", "5/min")
+    
+class AccountDeleteRateThrottle(UserRateThrottle):
+    """Límite de intentos al eliminar la cuenta (pide contraseña). ACCOUNT_DELETE_RATE, por defecto 5/min."""
+
+    scope = "account_delete"
+
+    def get_rate(self):
+        return getattr(settings, "ACCOUNT_DELETE_RATE", "5/min")
 
 
 def _my_payload(user):
@@ -189,3 +197,42 @@ class MyPasswordView(APIView):
             # Un PIN de recuperación pedido antes del cambio ya no debe servir
             user.reset_pins.filter(used_at__isnull=True).update(used_at=timezone.now())
         return Response({"detail": "Contraseña actualizada."})
+
+class MyAccountDeleteView(APIView):
+    """
+    POST /api/users/me/delete/  body: { "password": "..." }
+    Desactiva MI propia cuenta (borrado lógico, SCRUM-129). Respuestas:
+      200 -> cuenta desactivada (el token deja de servir de inmediato)
+      400 -> { "password": [...] } contraseña incorrecta / faltante, o { "detail": ... } si soy el único admin
+      401 -> sin sesión   ·   429 -> demasiados intentos
+    """
+
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [AccountDeleteRateThrottle]
+
+    def post(self, request):
+        user = request.user
+
+        # 1. Validar la contraseña (también rechaza cuentas sin contraseña propia, p. ej. GMAIL)
+        ser = DeleteAccountSerializer(data=request.data, context={"request": request})
+        ser.is_valid(raise_exception=True)
+
+        # 2. No se puede dejar el sistema sin administradores
+        if is_last_admin(user):
+            return Response(
+                {"detail": "No puedes eliminar tu cuenta porque eres el único administrador activo."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # 3. Borrado lógico: el registro se conserva (artículos, revisiones, auditoría)
+        user.user_delete = True
+        user.user_active = False
+        user.deactivation_reason = User.REASON_AUTO_ELIMINADO
+        user.user_updated_by = user
+        user.save(update_fields=[
+            "user_delete", "user_active", "deactivation_reason", "user_updated_by", "user_updated_at",
+        ])
+        # Un PIN de recuperación pedido antes de eliminar ya no debe servir
+        user.reset_pins.filter(used_at__isnull=True).update(used_at=timezone.now())
+
+        return Response({"detail": "Tu cuenta ha sido desactivada."}, status=status.HTTP_200_OK)

@@ -122,4 +122,12 @@ Recursos de este alcance: `user` y `user_role`. Los de `article`, `event` y `app
 | MEMBER (comité científico) | view, create, update, delete, active, inactive (no sobre administradores ni rol ADMIN) | update | view, download | view | view |
 | AUTHOR | — | — | view, create, update, download | view | view, create, update |
 
+### `POST /api/users/me/delete/` — eliminar mi propia cuenta (SCRUM-129)
+Autenticado; opera solo sobre el usuario de la sesión (no recibe id). Cuerpo: `{ "password": "contraseña actual" }`.
+Hace **borrado lógico**: `user_delete=true`, `user_active=false`, `deactivation_reason="AUTO_ELIMINADO"`; el registro se conserva.
+- `200` → `{ "detail": "Tu cuenta ha sido desactivada." }`. Desde ese momento el access/refresh token deja de servir y no se puede iniciar sesión.
+- `400` → `{ "password": ["La contraseña es incorrecta."] }` (también si falta el campo) o `{ "detail": "No puedes eliminar tu cuenta porque eres el único administrador activo." }`.
+- `401` sin sesión · `429` demasiados intentos (`ACCOUNT_DELETE_RATE`, por defecto 5/min).
+- Limitación conocida: aún no existe flujo de reactivación y el correo sigue reservado (registrarse con él devuelve `409`).
+
 La autorización se valida en el servidor en cada endpoint (`HasProfilePermission`); los permisos que el frontend lee de `/auth/me/` son solo informativos.

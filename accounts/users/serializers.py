@@ -237,3 +237,15 @@ class ChangePasswordSerializer(serializers.Serializer):
         if attrs["currentPassword"] == attrs["newPassword"]:
             raise serializers.ValidationError({"newPassword": "La nueva contraseña debe ser diferente a la actual."})
         return attrs
+    
+    
+# Auto-eliminación de cuenta
+
+class DeleteAccountSerializer(serializers.Serializer):
+    password = serializers.CharField(write_only=True, trim_whitespace=False)
+
+    def validate_password(self, value):
+        user = self.context["request"].user
+        if not user.check_password(value):
+            raise serializers.ValidationError("La contraseña es incorrecta.")
+        return value

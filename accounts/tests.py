@@ -105,6 +105,30 @@ class UserCrudTests(BaseCase):
         self.assertEqual(r.data["profiles"][0]["name"], "AUTHOR")  # NUEVO
         self.assertFalse(r.data["active"])
 
+    # --- NUEVOS TESTS SCRUM-129 ---
+    def test_auto_delete_account(self):
+        self.auth("member@t.co")
+        
+        # Contraseña incorrecta
+        r = self.client.post("/api/users/me/delete/", {"password": "wrong"}, format="json")
+        self.assertEqual(r.status_code, 400)
+        
+        # Contraseña correcta
+        r = self.client.post("/api/users/me/delete/", {"password": PWD}, format="json")
+        self.assertEqual(r.status_code, 200)
+        
+        # Verificar borrado lógico
+        self.member.refresh_from_db()
+        self.assertTrue(self.member.user_delete)
+        self.assertFalse(self.member.user_active)
+        self.assertEqual(self.member.deactivation_reason, "AUTO_ELIMINADO")
+
+    def test_auto_delete_last_admin_blocked(self):
+        self.auth("admin@t.co")
+        r = self.client.post("/api/users/me/delete/", {"password": PWD}, format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("único administrador", r.data["detail"])
+
 
 class PasswordRecoveryTests(BaseCase):
     """El envío del correo es de notifications; aquí se intercepta para leer el PIN."""
