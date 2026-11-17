@@ -301,3 +301,74 @@ class FinalSubmissionAndPublicationTests(ArticleSetupMixin, APITestCase):
         # El autor intenta darse el aval a sí mismo
         r = self.client.post(self.aval_publication_url, {}, format="json")
         self.assertEqual(r.status_code, status.HTTP_403_FORBIDDEN)
+
+
+# ==============================================================================
+# TESTS SCRUM-30: POST corrected-version (el autor sube su versión corregida)
+# ==============================================================================
+class CorrectedVersionUploadTests(ArticleSetupMixin, APITestCase):
+
+    def pdf(self, name="corregido.pdf", content=b"%PDF-1.4 corregido"):
+        return SimpleUploadedFile(name, content, content_type="application/pdf")
+
+    def test_author_uploads_corrected_version(self):
+        self.client.force_authenticate(self.author)
+        r = self.client.post(self.corrected_url, {"corrected_pdf": self.pdf()}, format="multipart")
+        self.assertEqual(r.status_code, status.HTTP_201_CREATED)
+        att = ArticleAttached.objects.get(article=self.article, article_attached_version="Corregida")
+        self.assertEqual(att.article_attached_created_by, self.author)
+        self.assertEqual(r.data["corrected_version"]["article_attached_id"], att.article_attached_id)
+
+    def test_uploaded_version_is_returned_by_get(self):
+        self.client.force_authenticate(self.author)
+        self.client.post(self.corrected_url, {"corrected_pdf": self.pdf()}, format="multipart")
+        r = self.client.get(self.corrected_url)
+        self.assertEqual(r.data["corrected_version"]["article_attached_version"], "Corregida")
+
+    def test_audit_fields_updated(self):
+        self.client.force_authenticate(self.author)
+        self.client.post(self.corrected_url, {"corrected_pdf": self.pdf()}, format="multipart")
+        self.article.refresh_from_db()
+        self.assertEqual(self.article.article_updated_by, self.author)
+        self.assertIsNotNone(self.article.article_updated_at)
+
+    def test_unauthenticated_gets_401(self):
+        r = self.client.post(self.corrected_url, {"corrected_pdf": self.pdf()}, format="multipart")
+        self.assertEqual(r.status_code, 401)
+
+    def test_non_owner_gets_403_and_nothing_saved(self):
+        for u in (self.other_author, self.admin, self.member, self.reviewer):
+            self.client.force_authenticate(u)
+            r = self.client.post(self.corrected_url, {"corrected_pdf": self.pdf()}, format="multipart")
+            self.assertEqual(r.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertFalse(ArticleAttached.objects.filter(article=self.article).exists())
+
+    def test_non_pdf_gets_400(self):
+        self.client.force_authenticate(self.author)
+        txt = SimpleUploadedFile("a.txt", b"texto", content_type="text/plain")
+        r = self.client.post(self.corrected_url, {"corrected_pdf": txt}, format="multipart")
+        self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("corrected_pdf", r.data)
+
+    def test_empty_and_oversized_gets_400(self):
+        self.client.force_authenticate(self.author)
+        empty = self.pdf(content=b"")
+        r = self.client.post(self.corrected_url, {"corrected_pdf": empty}, format="multipart")
+        self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
+        big = self.pdf(content=b"0" * (10 * 1024 * 1024 + 1))
+        r = self.client.post(self.corrected_url, {"corrected_pdf": big}, format="multipart")
+        self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_missing_file_gets_400(self):
+        self.client.force_authenticate(self.author)
+        r = self.client.post(self.corrected_url, {}, format="multipart")
+        self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_nonexistent_and_deleted_article_404(self):
+        self.client.force_authenticate(self.author)
+        r = self.client.post("/api/articles/99999/corrected-version/", {"corrected_pdf": self.pdf()}, format="multipart")
+        self.assertEqual(r.status_code, 404)
+        self.article.article_delete = True
+        self.article.save()
+        r = self.client.post(self.corrected_url, {"corrected_pdf": self.pdf()}, format="multipart")
+        self.assertEqual(r.status_code, 404)

@@ -15,7 +15,9 @@ from rest_framework.views import APIView
 from .models import Article, ArticleReviewer, ArticleAttached
 from .serializers import (
     ArticleCorrectedVersionSerializer, 
+    ArticleAttachedSerializer,
     AvalInputSerializer,
+    CorrectedVersionUploadSerializer,
     FinalSubmissionSerializer  # <-- Nuevo para SCRUM-31
 )
 from .services import upload_file # <-- Importamos nuestro servicio
@@ -46,7 +48,10 @@ def _is_active_reviewer(user, article):
 # VISTAS DE LA SCRUM-30 (CORREGIDAS)
 # ==============================================================================
 class ArticleCorrectedVersionView(APIView):
-    """GET /api/articles/{id}/corrected-version/  (CA-01)"""
+    """
+    GET  /api/articles/{id}/corrected-version/  (CA-01) → versión adjunta más reciente
+    POST /api/articles/{id}/corrected-version/          → el autor sube su PDF corregido
+    """
     permission_classes = [IsAuthenticated]
 
     def get(self, request, pk):
@@ -55,6 +60,38 @@ class ArticleCorrectedVersionView(APIView):
         if not (is_committee(request.user) or is_author or _is_active_reviewer(request.user, article)):
             raise PermissionDenied("No tienes permiso para ver esta versión.")
         return Response(ArticleCorrectedVersionSerializer(article).data, status=status.HTTP_200_OK)
+
+    @transaction.atomic
+    def post(self, request, pk):
+        article = get_object_or_404(Article, article_id=pk, article_delete=False)
+
+        if article.article_created_by_id != request.user.pk:
+            raise PermissionDenied("Solo el autor puede subir la versión corregida.")
+
+        serializer = CorrectedVersionUploadSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        # Usa Plan A (Supabase) o Plan B (local) automáticamente
+        corrected_url = upload_file(serializer.validated_data['corrected_pdf'], "corrected_versions")
+
+        attachment = ArticleAttached.objects.create(
+            article=article,
+            article_attached_url=corrected_url,
+            article_attached_version="Corregida",
+            article_attached_created_by=request.user,
+        )
+
+        article.article_updated_by = request.user
+        article.article_updated_at = timezone.now()
+        article.save()
+
+        return Response(
+            {
+                "detail": "Versión corregida subida correctamente.",
+                "corrected_version": ArticleAttachedSerializer(attachment).data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class ArticleAvalPresentationView(APIView):

@@ -64,3 +64,17 @@ class FinalSubmissionSerializer(serializers.Serializer):
         if value.size > 10 * 1024 * 1024:
             raise serializers.ValidationError("El copyright no debe superar los 10MB.")
         return value
+
+
+class CorrectedVersionUploadSerializer(serializers.Serializer):
+    """SCRUM-30: PDF de la versión corregida que sube el autor."""
+    corrected_pdf = serializers.FileField()
+
+    def validate_corrected_pdf(self, value):
+        if not value.name.lower().endswith('.pdf'):
+            raise serializers.ValidationError("El archivo corregido debe ser un PDF.")
+        if value.size == 0:
+            raise serializers.ValidationError("El archivo corregido está vacío.")
+        if value.size > 10 * 1024 * 1024:  # 10 MB
+            raise serializers.ValidationError("El archivo corregido no debe superar los 10MB.")
+        return value
