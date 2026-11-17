@@ -1,5 +1,5 @@
 from django.db import models
-
+import uuid
 
 class Topic(models.Model):
     topic_id = models.AutoField(primary_key=True)
@@ -61,6 +61,12 @@ class Article(models.Model):
     article = models.TextField()
     article_date = models.DateField(null=True, blank=True)
     article_copyright_url = models.URLField(blank=True, null=True)
+    
+    
+    verification_code = models.UUIDField(default=uuid.uuid4, editable=False, null=True, blank=True)
+    is_eligible_for_proceedings = models.BooleanField(default=False)
+    
+
     article_active = models.BooleanField(default=True)
     article_delete = models.BooleanField(default=False)
 
@@ -100,6 +106,8 @@ class Article(models.Model):
             "article": self.article,
             "article_date": str(self.article_date) if self.article_date else None,
             "article_copyright_url": self.article_copyright_url,
+            "verification_code": str(self.verification_code) if self.verification_code else None,
+            "is_eligible_for_proceedings": self.is_eligible_for_proceedings,
             "article_active": self.article_active,
             "article_delete": self.article_delete,
             "article_created_by": self.article_created_by_id,

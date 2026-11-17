@@ -45,3 +45,7 @@ class AvalPresentationSerializer(serializers.ModelSerializer):
         
 class AvalInputSerializer(serializers.Serializer):
     comment = serializers.CharField(required=False, allow_blank=True, max_length=1000)
+    
+class FinalSubmissionSerializer(serializers.Serializer):
+    final_pdf = serializers.FileField()
+    copyright_pdf = serializers.FileField()
