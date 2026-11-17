@@ -1,9 +1,9 @@
 from django.core.management import call_command
+from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from accounts.models import Profile, User
-
 from .models import Article, ArticleAttached, ArticleReviewer, Topic
 
 
@@ -33,6 +33,9 @@ class ArticleSetupMixin:
         )
         self.aval_url = f"/api/articles/{self.article.article_id}/aval-presentation/"
         self.corrected_url = f"/api/articles/{self.article.article_id}/corrected-version/"
+        # URLs para SCRUM-31
+        self.final_submission_url = f"/api/articles/{self.article.article_id}/final-submission/"
+        self.aval_publication_url = f"/api/articles/{self.article.article_id}/aval-publication/"
 
 
 class AvalPresentationTests(ArticleSetupMixin, APITestCase):
@@ -222,3 +225,79 @@ class CorrectedVersionTests(ArticleSetupMixin, APITestCase):
         self.article.article_delete = True
         self.article.save()
         self.assertEqual(self.client.get(self.corrected_url).status_code, 404)
+
+
+# ==============================================================================
+# NUEVOS TESTS PARA LA SCRUM-31 (Final Submission & Aval Publication)
+# ==============================================================================
+class FinalSubmissionAndPublicationTests(ArticleSetupMixin, APITestCase):
+    
+    def get_mock_files(self):
+        pdf = SimpleUploadedFile("test.pdf", b"%PDF-1.4 archivo de prueba", content_type="application/pdf")
+        img = SimpleUploadedFile("test.png", b"imagen de prueba", content_type="image/png")
+        txt = SimpleUploadedFile("test.txt", b"texto plano", content_type="text/plain")
+        return pdf, img, txt
+
+    # --- Tests para final-submission ---
+    def test_final_submission_success(self):
+        self.client.force_authenticate(self.author)
+        pdf, img, _ = self.get_mock_files()
+        
+        data = {"final_pdf": pdf, "copyright_pdf": img}
+        r = self.client.post(self.final_submission_url, data, format="multipart")
+        
+        self.assertEqual(r.status_code, status.HTTP_201_CREATED)
+        self.article.refresh_from_db()
+        self.assertIsNotNone(self.article.article_copyright_url)
+        self.assertTrue(ArticleAttached.objects.filter(article=self.article, article_attached_version="Final").exists())
+
+    def test_final_submission_wrong_author_gets_403(self):
+        self.client.force_authenticate(self.other_author)
+        pdf, img, _ = self.get_mock_files()
+        r = self.client.post(self.final_submission_url, {"final_pdf": pdf, "copyright_pdf": img}, format="multipart")
+        self.assertEqual(r.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_final_submission_invalid_file_type_gets_400(self):
+        self.client.force_authenticate(self.author)
+        _, _, txt = self.get_mock_files()
+        r = self.client.post(self.final_submission_url, {"final_pdf": txt, "copyright_pdf": txt}, format="multipart")
+        self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
+
+    # --- Tests para aval-publication ---
+    def test_aval_publication_success(self):
+        # 1. Primero el autor sube el copyright
+        self.client.force_authenticate(self.author)
+        pdf, img, _ = self.get_mock_files()
+        self.client.post(self.final_submission_url, {"final_pdf": pdf, "copyright_pdf": img}, format="multipart")
+        
+        # 2. El comité da el aval (Usamos self.reviewer en vez de self.admin)
+        self.client.force_authenticate(self.reviewer)
+        r = self.client.post(self.aval_publication_url, {}, format="json")
+        
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        self.assertEqual(r["Content-Type"], "application/pdf")
+        self.assertTrue(r.content.startswith(b"%PDF"))
+        
+        self.article.refresh_from_db()
+        self.assertTrue(self.article.is_eligible_for_proceedings)
+        self.assertIsNotNone(self.article.verification_code)
+        
+        self.assignment.refresh_from_db()
+        self.assertEqual(self.assignment.status, "FOR_PUBLICATION")
+
+    def test_aval_publication_blocked_without_copyright(self):
+        # Intentamos avalar sin que el autor haya subido nada
+        self.client.force_authenticate(self.admin)
+        r = self.client.post(self.aval_publication_url, {}, format="json")
+        self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("copyright", r.data["detail"].lower())
+
+    def test_aval_publication_author_cannot_self_aval(self):
+        # El autor sube su copyright
+        self.client.force_authenticate(self.author)
+        pdf, img, _ = self.get_mock_files()
+        self.client.post(self.final_submission_url, {"final_pdf": pdf, "copyright_pdf": img}, format="multipart")
+        
+        # El autor intenta darse el aval a sí mismo
+        r = self.client.post(self.aval_publication_url, {}, format="json")
+        self.assertEqual(r.status_code, status.HTTP_403_FORBIDDEN)

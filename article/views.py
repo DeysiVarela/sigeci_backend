@@ -160,6 +160,9 @@ class ArticleAvalPublicationView(APIView):
     def post(self, request, pk):
         article = get_object_or_404(Article, article_id=pk, article_delete=False)
         user = request.user
+        
+        if article.article_created_by_id == user.pk:
+            raise PermissionDenied("No puedes avalar tu propio artículo.")
 
         committee = is_committee(user)
         row = ArticleReviewer.objects.select_for_update().filter(article=article, user=user).first()

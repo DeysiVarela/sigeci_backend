@@ -49,3 +49,18 @@ class AvalInputSerializer(serializers.Serializer):
 class FinalSubmissionSerializer(serializers.Serializer):
     final_pdf = serializers.FileField()
     copyright_pdf = serializers.FileField()
+
+    def validate_final_pdf(self, value):
+        if not value.name.lower().endswith('.pdf'):
+            raise serializers.ValidationError("El archivo final debe ser un PDF.")
+        if value.size > 10 * 1024 * 1024:  # 10 MB
+            raise serializers.ValidationError("El archivo final no debe superar los 10MB.")
+        return value
+
+    def validate_copyright_pdf(self, value):
+        valid_extensions = ('.pdf', '.jpg', '.jpeg', '.png')
+        if not value.name.lower().endswith(valid_extensions):
+            raise serializers.ValidationError("El copyright debe ser un PDF o una imagen (JPG/PNG).")
+        if value.size > 10 * 1024 * 1024:
+            raise serializers.ValidationError("El copyright no debe superar los 10MB.")
+        return value
