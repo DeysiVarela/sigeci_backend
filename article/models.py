@@ -191,7 +191,7 @@ class ArticleReviewer(models.Model):
     )
     user = models.ForeignKey(
         "accounts.User",
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         db_column="user_id",
         related_name="article_assignments"
     )
@@ -223,6 +223,9 @@ class ArticleReviewer(models.Model):
     class Meta:
         db_table = "article_reviewer"
         ordering = ["-article_reviewer_id"]
+        constraints = [ 
+        models.UniqueConstraint(fields=["article", "user"], name="unique_article_reviewer")
+        ]
 
     def __str__(self):
         return f"Reviewer {self.article_reviewer_id} - User {self.user_id} on Article {self.article_id} ({self.status})"

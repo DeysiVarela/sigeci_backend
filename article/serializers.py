@@ -42,3 +42,6 @@ class AvalPresentationSerializer(serializers.ModelSerializer):
             "article_reviewer_updated_by"
         ]
         read_only_fields = fields
+        
+class AvalInputSerializer(serializers.Serializer):
+    comment = serializers.CharField(required=False, allow_blank=True, max_length=1000)
