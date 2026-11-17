@@ -10,3 +10,13 @@ variables:
     value: https://sigeci-backend.onrender.com/api/v1
     disabled: true
     description: ""
+  - name: evaluationUrl
+    value: http://localhost:8000/api
+    description: "Base para los endpoints de evaluaciones SCRUM-32."
+  - name: evaluationUrl
+    value: https://sigeci-backend.onrender.com/api
+    disabled: true
+    description: "Base remota para los endpoints de evaluaciones SCRUM-32."
+  - name: reviewId
+    value: "1"
+    description: "ID de la asignación ArticleReviewer."

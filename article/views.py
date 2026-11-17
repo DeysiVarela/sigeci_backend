@@ -3,7 +3,11 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from util.auth_service import require_permission
 
-from .models import Article
+from django.utils import timezone
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from .models import Article, ArticleReviewer
 
 
 def _parse_body(request):
@@ -136,4 +140,139 @@ def delete_article(request, article_id):
         return JsonResponse({"detail": "Artículo eliminado exitosamente."}, status=200)
     except Article.DoesNotExist:
         return JsonResponse({"detail": "Artículo no encontrado."}, status=404)
+
+
+def _member_only(request):
+    return getattr(request.user, "profile", None) and request.user.profile.profile_name == "MEMBER"
+
+
+def _evaluation_payload(review):
+    article = review.article
+    attachment = review.article_attached
+    if attachment is None:
+        attachment = article.attachments.filter(
+            article_attached_active=True,
+            article_attached_delete=False,
+        ).order_by("-article_attached_id").first()
+
+    status_map = {
+        "PENDING": "PENDIENTE",
+        "IN_REVIEW": "EN_REVISION",
+        "APPROVED": "APROBADO",
+        "REJECTED": "RECHAZADO",
+    }
+    pdf_url = attachment.article_attached_url if attachment else None
+    pdf_name = pdf_url.rstrip("/").split("/")[-1].split("?")[0] if pdf_url else None
+
+    return {
+        "id": review.article_reviewer_id,
+        "articleId": article.article_id,
+        "title": article.article_subject,
+        "author": (
+            f"{article.article_created_by.user_name} {article.article_created_by.user_lastname}"
+            if article.article_created_by else ""
+        ).strip(),
+        "category": article.topic_id.topic_subject if article.topic_id else "",
+        "summary": article.article_description,
+        "deadline": str(review.evaluation_deadline) if review.evaluation_deadline else None,
+        "status": status_map.get(review.status, review.status),
+        "comments": review.comment or "",
+        "verdict": status_map.get(review.status, review.status),
+        "pdfSignedUrl": pdf_url,
+        "pdfFileName": pdf_name,
+    }
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def assigned_evaluations(request):
+    if not _member_only(request):
+        return Response({"detail": "Solo los miembros del Comité Científico pueden consultar evaluaciones."}, status=403)
+
+    reviews = (
+        ArticleReviewer.objects.select_related(
+            "article", "article__topic_id", "article__article_created_by",
+            "article_attached", "user",
+        )
+        .filter(
+            user=request.user,
+            article_reviewer_active=True,
+            article_reviewer_delete=False,
+            article__article_active=True,
+            article__article_delete=False,
+        )
+    )
+    return Response([_evaluation_payload(review) for review in reviews], status=200)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def assigned_evaluation_detail(request, review_id):
+    if not _member_only(request):
+        return Response({"detail": "Solo los miembros del Comité Científico pueden consultar evaluaciones."}, status=403)
+
+    review = (
+        ArticleReviewer.objects.select_related(
+            "article", "article__topic_id", "article__article_created_by", "article_attached",
+        )
+        .filter(
+            article_reviewer_id=review_id,
+            user=request.user,
+            article_reviewer_active=True,
+            article_reviewer_delete=False,
+            article__article_active=True,
+            article__article_delete=False,
+        )
+        .first()
+    )
+    if review is None:
+        return Response({"detail": "La evaluación no está asignada a tu cuenta."}, status=404)
+
+    if review.status == "PENDING":
+        review.status = "IN_REVIEW"
+        review.article_reviewer_updated_by = request.user
+        review.article_reviewer_updated_at = timezone.now()
+        review.save(update_fields=[
+            "status", "article_reviewer_updated_by", "article_reviewer_updated_at"
+        ])
+
+    return Response(_evaluation_payload(review), status=200)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def submit_evaluation_verdict(request, review_id):
+    if not _member_only(request):
+        return Response({"detail": "Solo los miembros del Comité Científico pueden emitir veredictos."}, status=403)
+
+    review = ArticleReviewer.objects.select_related("article").filter(
+        article_reviewer_id=review_id,
+        user=request.user,
+        article_reviewer_active=True,
+        article_reviewer_delete=False,
+        article__article_active=True,
+        article__article_delete=False,
+    ).first()
+    if review is None:
+        return Response({"detail": "La evaluación no está asignada a tu cuenta."}, status=404)
+
+    if review.status in ("APPROVED", "REJECTED"):
+        return Response({"detail": "El veredicto ya fue registrado y no puede modificarse."}, status=409)
+
+    verdict = str(request.data.get("verdict") or "").strip().upper()
+    comments = str(request.data.get("comments") or "").strip()
+
+    if verdict not in ("APPROVED", "REJECTED", "APROBADO", "RECHAZADO"):
+        return Response({"detail": "El veredicto debe ser APROBADO o RECHAZADO."}, status=400)
+    if not comments:
+        return Response({"detail": "Los comentarios cualitativos son obligatorios."}, status=400)
+
+    review.status = "APPROVED" if verdict in ("APPROVED", "APROBADO") else "REJECTED"
+    review.comment = comments
+    review.article_reviewer_updated_by = request.user
+    review.article_reviewer_updated_at = timezone.now()
+    review.save(update_fields=[
+        "status", "comment", "article_reviewer_updated_by", "article_reviewer_updated_at"
+    ])
+    return Response(_evaluation_payload(review), status=200)
 

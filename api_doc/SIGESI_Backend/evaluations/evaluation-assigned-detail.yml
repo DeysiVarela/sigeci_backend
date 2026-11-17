@@ -1,0 +1,71 @@
+info:
+  name: Detalle de evaluación asignada
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{evaluationUrl}}/evaluations/assigned/{{reviewId}}/"
+  headers:
+    - name: Authorization
+      value: "Bearer {{token}}"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+docs: |-
+  Requiere el perfil MEMBER y que la evaluación pertenezca al usuario autenticado.
+  Si el estado inicial es PENDIENTE, se cambia a EN_REVISION al consultar.
+
+  Respuesta 200: objeto de evaluación.
+  Respuesta 404: la evaluación no existe o no está asignada al usuario.
+
+examples:
+  - name: éxito
+    request:
+      url: "{{evaluationUrl}}/evaluations/assigned/1/"
+      method: GET
+      headers:
+        - name: Authorization
+          value: "Bearer {{token}}"
+    response:
+      status: 200
+      statusText: OK
+      body:
+        type: json
+        data: |-
+          {
+            "id": 1,
+            "articleId": 20,
+            "title": "Artículo asignado",
+            "author": "Ana Pérez",
+            "category": "Inteligencia Artificial",
+            "summary": "Resumen científico",
+            "deadline": "2026-12-01",
+            "status": "EN_REVISION",
+            "comments": "",
+            "verdict": "EN_REVISION",
+            "pdfSignedUrl": "https://storage.example.test/signed-article.pdf",
+            "pdfFileName": "signed-article.pdf"
+          }
+  - name: evaluación ajena o inexistente
+    request:
+      url: "{{evaluationUrl}}/evaluations/assigned/999/"
+      method: GET
+      headers:
+        - name: Authorization
+          value: "Bearer {{token}}"
+    response:
+      status: 404
+      statusText: Not Found
+      body:
+        type: json
+        data: |-
+          {
+            "detail": "La evaluación no está asignada a tu cuenta."
+          }
