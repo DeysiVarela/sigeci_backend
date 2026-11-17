@@ -75,6 +75,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'accounts',
     'auth_api',
+    'article',
     'notifications',
 ]
 
