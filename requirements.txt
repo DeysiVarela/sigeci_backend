@@ -13,3 +13,5 @@ tzdata==2026.5
 django-cors-headers>=4.7
 djangorestframework-simplejwt>=5.5
 urllib3==2.8.0
+reportlab==5.1.0
+supabase==2.34.1
