@@ -43,10 +43,10 @@ def check_permission(user_id, endpoint, action):
                     profile_action pa 
                 inner join profile p 
                     on pa.profile_id = p.profile_id 
-                inner join users u 
-                    on u.profile_id = p.profile_id 
+                inner join user_profiles up 
+                    on up.profile_id = p.profile_id
                 where 
-                    u.user_id = %s
+                    up.user_id = %s
                     and pa.profile_action_action = %s
             """,
             [user_id, endpoint]
@@ -66,6 +66,7 @@ def require_permission(endpoint: str, action: str):
         @wraps(func)
         def wrapper(request, *args, **kwargs):
             token = request.headers.get("Authorization")
+            profile = request.headers.get("profile")
             payload = decode_token(token)
             if not payload:
                 return JsonResponse({
@@ -74,12 +75,11 @@ def require_permission(endpoint: str, action: str):
                     "internMessage": "Token inválido o expirado"
                 }, status=401)
             user_id         = payload.get("user_id")
-            profile_id      = payload.get("profile_id")
             user_seed_token = payload.get("user_seed_token")
 
             user = {
                 "user_id":          user_id,
-                "profile_id":       profile_id,
+                "profile_id":       profile,
                 "user_seed_token":  user_seed_token
             }
             

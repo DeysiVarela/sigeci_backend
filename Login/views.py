@@ -74,7 +74,6 @@ def login(request):
     refresh         = RefreshToken.for_user(user)
 
     refresh["user_id"]          = user.user_id
-    refresh["profile_id"]       = user.profile_id
     refresh["user_seed_token"]  = user.user_seed_token
 
     access_token    = str(refresh.access_token)
