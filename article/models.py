@@ -64,7 +64,7 @@ class Article(models.Model):
     
     
     verification_code = models.UUIDField(default=uuid.uuid4, editable=False, null=True, blank=True)
-    is_eligible_for_proceedings = models.BooleanField(default=False)
+    #is_eligible_for_proceedings = models.BooleanField(default=False)
     
 
     article_active = models.BooleanField(default=True)
