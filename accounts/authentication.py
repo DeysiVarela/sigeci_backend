@@ -15,7 +15,7 @@ class SigeciJWTAuthentication(JWTAuthentication):
         except KeyError:
             raise InvalidToken("El token no contiene un identificador de usuario.")
 
-        user = User.objects.select_related("profile").filter(pk=user_id).first()
+        user = User.objects.prefetch_related("profiles").filter(pk=user_id).first()
         if user is None or not user.user_active or user.user_delete:
             raise AuthenticationFailed("Usuario inexistente o inactivo.", code="user_inactive")
         return user

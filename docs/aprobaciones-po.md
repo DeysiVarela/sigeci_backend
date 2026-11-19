@@ -35,6 +35,8 @@ Decisión: ☐ Aprobada ☐ Con cambios: ____________________
 | Registro público (SCRUM-120) | rol AUTHOR siempre; un rol en la petición se rechaza (400); correo repetido responde 409 con mensaje claro (revela que el correo existe) | ☐ |
 | Hash de contraseñas (CA-07 de SCRUM-120) | el criterio dice bcrypt o argon2; el equipo decidió mantener el hash de Django (PBKDF2-SHA256) para todo el sistema | ☐ |
 | Verificación de correo | el registro NO exige confirmar el correo: la cuenta queda activa al crearse | ☐ |
+| Mi perfil (SCRUM-125) | cada usuario edita solo su nombre, apellido y correo; el rol, el estado y el proveedor no se editan; el correo se cambia sin verificación | ☐ |
+| Cambio de contraseña | pide la contraseña actual; no cierra las demás sesiones (los tokens ya emitidos siguen vigentes hasta vencer) | ☐ |
 | Vigencia de sesión | access 30 min, refresh 1 día | ☐ |
 
 Aprobado por: ______________________  Fecha: ____________

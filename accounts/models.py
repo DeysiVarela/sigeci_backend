@@ -71,10 +71,9 @@ class User(models.Model):
     user_password = models.TextField()
     user_email = models.CharField(max_length=120, unique=True)
     user_provider = models.CharField(max_length=60, choices=PROVIDERS, default=PROVIDER_ACCOUNT)
-    profile = models.ForeignKey(
-        Profile, on_delete=models.PROTECT, db_column="profile_id", related_name="users"
-    )
+
     user_seed_token = models.CharField(max_length=120, null=True, blank=True)
+    profiles = models.ManyToManyField(Profile, related_name="users", db_table="user_profiles")
     user_active = models.BooleanField(default=True)
     user_delete = models.BooleanField(default=False)
 
@@ -115,8 +114,9 @@ class User(models.Model):
 
     # --- Permisos por perfil ---
     def has_perm_on(self, action, permission):
+        # Busca en todos los roles del usuario
         return ProfileAction.objects.filter(
-            profile_id=self.profile_id,
+            profile__in=self.profiles.all(),
             profile__profile_active=True,
             profile__profile_delete=False,
             profile_action_active=True,
@@ -126,13 +126,15 @@ class User(models.Model):
         ).exists()
 
     def permissions_map(self):
+        # Obtiene los permisos de todos los roles del usuario
         rows = ProfileAction.objects.filter(
-            profile_id=self.profile_id,
+            profile__in=self.profiles.all(),
             profile__profile_active=True,
             profile__profile_delete=False,
             profile_action_active=True,
             profile_action_delete=False,
-        ).values_list("profile_action_action", "profile_action_permissions")
+        ).values_list("profile_action_action", "profile_action_permissions").distinct()
+        
         result = {}
         for action, perm in rows:
             result.setdefault(action, []).append(perm)
