@@ -17,7 +17,8 @@ class ArticleCorrectedVersionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Article
-        fields = ["article_id", "article_subject", "article_description", "corrected_version"]
+        fields = ["article_id", "article_subject", "article_description",
+        "article_copyright_url", "corrected_version"]
 
     def get_corrected_version(self, obj):
         # Obtenemos la versión más reciente activa y no eliminada
@@ -79,12 +80,3 @@ class CorrectedVersionUploadSerializer(serializers.Serializer):
             raise serializers.ValidationError("El archivo corregido no debe superar los 10MB.")
         return value
 
-class CorrectedSubmissionSerializer(serializers.Serializer):
-    corrected_pdf = serializers.FileField()
-
-    def validate_corrected_pdf(self, value):
-        if not value.name.lower().endswith('.pdf'):
-            raise serializers.ValidationError("El archivo corregido debe ser un PDF.")
-        if value.size > 10 * 1024 * 1024:
-            raise serializers.ValidationError("El archivo corregido no debe superar los 10MB.")
-        return value
