@@ -78,3 +78,13 @@ class CorrectedVersionUploadSerializer(serializers.Serializer):
         if value.size > 10 * 1024 * 1024:  # 10 MB
             raise serializers.ValidationError("El archivo corregido no debe superar los 10MB.")
         return value
+
+class CorrectedSubmissionSerializer(serializers.Serializer):
+    corrected_pdf = serializers.FileField()
+
+    def validate_corrected_pdf(self, value):
+        if not value.name.lower().endswith('.pdf'):
+            raise serializers.ValidationError("El archivo corregido debe ser un PDF.")
+        if value.size > 10 * 1024 * 1024:
+            raise serializers.ValidationError("El archivo corregido no debe superar los 10MB.")
+        return value
