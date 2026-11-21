@@ -1,6 +1,8 @@
 import json
 from django.http import JsonResponse
 from django.utils import timezone
+from django.db import connection
+from util.utilDB import queryDB
 from django.views.decorators.csrf import csrf_exempt
 from util.auth_service import require_permission
 from util.uploads.uploads import delete_file
@@ -29,21 +31,51 @@ def list_topics(request):
 
 @require_permission(endpoint="article", action="view")
 def list_articles(request):
-    """Listar artículos activos."""
-    articles = (
-        Article.objects
-        .select_related("topic_id", "article_created_by")
-        .prefetch_related("attachments")
-        .filter(article_active=True)
-    )
+    print(request.user, "====")
+
+    #  switch por perfiles
+    profile = str(request.user.get("profile_id"))
+    user = request.user.get("user_id")
+    articles = []
+    match profile:
+        case "1":
+            articles = queryDB("""
+                select 
+                    ar.*,
+                    tp.topic_subject
+                from article ar
+                inner join topic tp
+                    on tp.topic_id = ar.topic_id
+            """, None)
+            
+
+            print("tu perfil", 1)
+
+        case "2":
+            articles = (
+                Article.objects
+                .select_related("topic_id", "article_created_by")
+                .prefetch_related("attachments")
+                .filter(article_active=True)
+            )
+        case "3":
+            articles = queryDB("""
+                select 
+                    ar.*,
+                    tp.topic_subject
+                from article ar
+                inner join topic tp
+                    on tp.topic_id = ar.topic_id
+                where ar.article_created_by = %s
+            """, [user])
+
     return JsonResponse({
         "success": True,
         "message": "Artículos obtenidos con éxito.",
-        "data": [a.to_dict() for a in articles]
+        "data": articles
     }, safe=False, status=200)
 
 
-@csrf_exempt
 @require_permission(endpoint="article", action="view")
 def detail_article(request, article_id):
     """Consultar detalle, actualizar o eliminar según el método HTTP."""
@@ -70,7 +102,6 @@ def detail_article(request, article_id):
         return JsonResponse({"detail": "Artículo no encontrado.", "success": False}, status=404)
 
 
-@csrf_exempt
 @require_permission(endpoint="article", action="create")
 def create_article(request):
     """Crear un nuevo artículo."""
@@ -101,7 +132,7 @@ def create_article(request):
         article_created_by_id=created_by_id,
     )
 
-    attached_url = data.get("article_attached_url") or data.get("pdf_url") or data.get("file_url")
+    attached_url = data.get("article_attached_url")
     if attached_url:
         ArticleAttached.objects.create(
             article=article,

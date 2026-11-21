@@ -1,0 +1,294 @@
+info:
+  name: /article copy
+  type: http
+  seq: 5
+
+http:
+  method: GET
+  url: "{{url}}/article"
+  headers:
+    - name: Authorization
+      value: "{{token}}"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+examples:
+  - name: not permission
+    request:
+      url: "{{url}}/article"
+      method: GET
+      headers:
+        - name: Authorization
+          value: "{{token}}"
+    response:
+      status: 403
+      statusText: Forbidden
+      headers:
+        - name: date
+          value: Mon, 09 Nov 2026 02:47:39 GMT
+        - name: server
+          value: WSGIServer/0.2 CPython/3.14.6
+        - name: content-type
+          value: application/json
+        - name: x-frame-options
+          value: DENY
+        - name: content-length
+          value: "83"
+        - name: x-content-type-options
+          value: nosniff
+        - name: referrer-policy
+          value: same-origin
+        - name: cross-origin-opener-policy
+          value: same-origin
+        - name: vary
+          value: origin
+      body:
+        type: json
+        data: |-
+          {
+            "message": "0000",
+            "success": false,
+            "internMessage": "you don't have permission"
+          }
+  - name: /article
+    request:
+      url: "{{url}}/article"
+      method: GET
+      headers:
+        - name: Authorization
+          value: "{{token}}"
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: date
+          value: Thu, 19 Nov 2026 12:25:57 GMT
+        - name: server
+          value: WSGIServer/0.2 CPython/3.14.6
+        - name: content-type
+          value: application/json
+        - name: x-frame-options
+          value: DENY
+        - name: content-length
+          value: "10396"
+        - name: x-content-type-options
+          value: nosniff
+        - name: referrer-policy
+          value: same-origin
+        - name: cross-origin-opener-policy
+          value: same-origin
+        - name: vary
+          value: origin
+      body:
+        type: json
+        data: |-
+          {
+            "success": true,
+            "message": "Artículos obtenidos con éxito.",
+            "data": [
+              {
+                "article_id": 6,
+                "article_subject": "titulo test 1 EDIT",
+                "article_description": "test",
+                "topic_id": 3,
+                "topic_name": "Inteligencia Artificial",
+                "article": "content test",
+                "article_date": null,
+                "article_copyright_url": null,
+                "article_active": true,
+                "article_delete": false,
+                "article_created_by": null,
+                "article_created_by_name": null,
+                "article_created_at": "2026-11-19T11:58:13.078450+00:00",
+                "article_updated_by": 8,
+                "article_updated_at": "2026-11-19T12:25:21.203132+00:00",
+                "article_attached_url": "https://ycydkgkgxgghvhkiyeth.storage.supabase.co/storage/v1/s3/software/articles/af562102-2fb2-4857-8caf-a42fe2a7364d.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=d5819a0320bae6372db3ec58649e8755%2F20261119%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261119T122557Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&X-Amz-Signature=56fb065564938ead190ac43fc86d989e11863ca2684394142ede0da89bf83ef5",
+                "article_attached_version": "1.0",
+                "attachments": [
+                  {
+                    "article_attached_id": 8,
+                    "article_id": 6,
+                    "article_attached_url": "https://ycydkgkgxgghvhkiyeth.storage.supabase.co/storage/v1/s3/software/articles/af562102-2fb2-4857-8caf-a42fe2a7364d.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=d5819a0320bae6372db3ec58649e8755%2F20261119%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261119T122557Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&X-Amz-Signature=56fb065564938ead190ac43fc86d989e11863ca2684394142ede0da89bf83ef5",
+                    "article_attached_version": "1.0",
+                    "article_attached_active": true,
+                    "article_attached_delete": false,
+                    "article_attached_created_by": null,
+                    "article_attached_created_at": "2026-11-19T11:58:13.168911+00:00",
+                    "article_attached_updated_by": null,
+                    "article_attached_updated_at": null
+                  }
+                ]
+              },
+              {
+                "article_id": 4,
+                "article_subject": "Prueba versión final",
+                "article_description": "Descripción de prueba",
+                "topic_id": 7,
+                "topic_name": "Pruebas",
+                "article": "Contenido de prueba",
+                "article_date": null,
+                "article_copyright_url": "/media/copyrights/d108f144-8bbc-4740-bda0-b50ef586da7a.pdf",
+                "article_active": true,
+                "article_delete": false,
+                "article_created_by": 16,
+                "article_created_by_name": "Autor 1",
+                "article_created_at": "2026-11-17T06:46:17.289481+00:00",
+                "article_updated_by": 16,
+                "article_updated_at": "2026-11-19T05:19:11.333231+00:00",
+                "article_attached_url": "https://ycydkgkgxgghvhkiyeth.storage.supabase.co/storage/v1/s3/software//media/final_versions/6c8757ff-f4eb-4ca8-a205-2cb41870001c.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=d5819a0320bae6372db3ec58649e8755%2F20261119%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261119T122557Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&X-Amz-Signature=bc980cff30923862b2a663a3776da062fab6a8c3be82dd518553f17327af2d5c",
+                "article_attached_version": "Final",
+                "attachments": [
+                  {
+                    "article_attached_id": 7,
+                    "article_id": 4,
+                    "article_attached_url": "https://ycydkgkgxgghvhkiyeth.storage.supabase.co/storage/v1/s3/software//media/final_versions/6c8757ff-f4eb-4ca8-a205-2cb41870001c.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=d5819a0320bae6372db3ec58649e8755%2F20261119%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261119T122557Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&X-Amz-Signature=bc980cff30923862b2a663a3776da062fab6a8c3be82dd518553f17327af2d5c",
+                    "article_attached_version": "Final",
+                    "article_attached_active": true,
+                    "article_attached_delete": false,
+                    "article_attached_created_by": 16,
+                    "article_attached_created_at": "2026-11-19T05:19:11.208283+00:00",
+                    "article_attached_updated_by": null,
+                    "article_attached_updated_at": null
+                  },
+                  {
+                    "article_attached_id": 6,
+                    "article_id": 4,
+                    "article_attached_url": "https://ycydkgkgxgghvhkiyeth.storage.supabase.co/storage/v1/s3/software//media/final_versions/99344b55-6eb8-4bc1-bfbe-c252bbed9ee9.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=d5819a0320bae6372db3ec58649e8755%2F20261119%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261119T122557Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&X-Amz-Signature=fd4ac1700348b8cb86b23c76a2fcdf4e1115a4f4039b1cbc408f937e574905c1",
+                    "article_attached_version": "Final",
+                    "article_attached_active": true,
+                    "article_attached_delete": false,
+                    "article_attached_created_by": 16,
+                    "article_attached_created_at": "2026-11-19T05:18:08.814739+00:00",
+                    "article_attached_updated_by": null,
+                    "article_attached_updated_at": null
+                  },
+                  {
+                    "article_attached_id": 5,
+                    "article_id": 4,
+                    "article_attached_url": "https://ycydkgkgxgghvhkiyeth.storage.supabase.co/storage/v1/s3/software//media/final_versions/93ef7a03-0431-42f5-ab88-185080067bd9.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=d5819a0320bae6372db3ec58649e8755%2F20261119%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261119T122557Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&X-Amz-Signature=e48772190ffc3542a7d963005900164a84a5e6c70bb08bc74a6f652ac0159ac6",
+                    "article_attached_version": "Final",
+                    "article_attached_active": true,
+                    "article_attached_delete": false,
+                    "article_attached_created_by": 16,
+                    "article_attached_created_at": "2026-11-19T03:06:54.266138+00:00",
+                    "article_attached_updated_by": null,
+                    "article_attached_updated_at": null
+                  },
+                  {
+                    "article_attached_id": 4,
+                    "article_id": 4,
+                    "article_attached_url": "https://ycydkgkgxgghvhkiyeth.storage.supabase.co/storage/v1/s3/software//media/final_versions/2703619a-e8b6-41cb-b23b-1cd90b789c3c.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=d5819a0320bae6372db3ec58649e8755%2F20261119%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261119T122557Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&X-Amz-Signature=4831178c4f64fafad381e74afce0bc62dde8b9067880e65bcd083dbb1d6d4818",
+                    "article_attached_version": "Final",
+                    "article_attached_active": true,
+                    "article_attached_delete": false,
+                    "article_attached_created_by": 16,
+                    "article_attached_created_at": "2026-11-19T03:06:00.263317+00:00",
+                    "article_attached_updated_by": null,
+                    "article_attached_updated_at": null
+                  },
+                  {
+                    "article_attached_id": 3,
+                    "article_id": 4,
+                    "article_attached_url": "https://ycydkgkgxgghvhkiyeth.storage.supabase.co/storage/v1/s3/software//media/final_versions/41cefc12-c7ef-4c05-9e99-75fa91016cf1.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=d5819a0320bae6372db3ec58649e8755%2F20261119%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261119T122557Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&X-Amz-Signature=066ee2585465210a8b35ae8cdb2c45ea9537271b446ea6dad17beef5238bb2f4",
+                    "article_attached_version": "Final",
+                    "article_attached_active": true,
+                    "article_attached_delete": false,
+                    "article_attached_created_by": 16,
+                    "article_attached_created_at": "2026-11-19T01:11:12.007795+00:00",
+                    "article_attached_updated_by": null,
+                    "article_attached_updated_at": null
+                  },
+                  {
+                    "article_attached_id": 2,
+                    "article_id": 4,
+                    "article_attached_url": "https://ycydkgkgxgghvhkiyeth.storage.supabase.co/storage/v1/s3/software//media/final_versions/2e0b480d-3690-49b9-9cd0-20f6bbe98256.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=d5819a0320bae6372db3ec58649e8755%2F20261119%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261119T122557Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&X-Amz-Signature=55c6ac6cf83460fb26c1323007519380b7a50c5593c65487a0c47e1351ae81f0",
+                    "article_attached_version": "Final",
+                    "article_attached_active": true,
+                    "article_attached_delete": false,
+                    "article_attached_created_by": 16,
+                    "article_attached_created_at": "2026-11-17T10:21:32.113483+00:00",
+                    "article_attached_updated_by": null,
+                    "article_attached_updated_at": null
+                  },
+                  {
+                    "article_attached_id": 1,
+                    "article_id": 4,
+                    "article_attached_url": "https://ycydkgkgxgghvhkiyeth.storage.supabase.co/storage/v1/s3/software//media/final_versions/fcde5720-1055-4128-a817-32d905366b0e.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=d5819a0320bae6372db3ec58649e8755%2F20261119%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261119T122557Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&X-Amz-Signature=4840dc35b0587f3499ce8c181d7a9d3167993c5e60d4efc5d7c0594f0222b418",
+                    "article_attached_version": "Final",
+                    "article_attached_active": true,
+                    "article_attached_delete": false,
+                    "article_attached_created_by": 1,
+                    "article_attached_created_at": "2026-11-17T07:00:00.169610+00:00",
+                    "article_attached_updated_by": null,
+                    "article_attached_updated_at": null
+                  }
+                ]
+              },
+              {
+                "article_id": 3,
+                "article_subject": "Prueba versión corregida",
+                "article_description": "Propuesta de integración del marco Scrum y Kanban para actualización semestral de programas académicos.",
+                "topic_id": 7,
+                "topic_name": "Pruebas",
+                "article": "Contenido de prueba",
+                "article_date": "2026-01-10",
+                "article_copyright_url": "https://creativecommons.org/licenses/by/4.0/",
+                "article_active": true,
+                "article_delete": false,
+                "article_created_by": 16,
+                "article_created_by_name": "Autor 1",
+                "article_created_at": "2026-11-09T03:07:04.006954+00:00",
+                "article_updated_by": null,
+                "article_updated_at": null,
+                "article_attached_url": null,
+                "article_attached_version": null,
+                "attachments": []
+              },
+              {
+                "article_id": 2,
+                "article_subject": "Optimización de Algoritmos Criptográficos en Sistemas Distribuidos",
+                "article_description": "Análisis comparativo de latencia y throughput en protocolos de cifrado asimétrico sobre microservicios.",
+                "topic_id": 4,
+                "topic_name": "Ciberseguridad",
+                "article": "Contenido completo del artículo sobre evaluación de curvas elípticas Ed25519 frente a RSA tradicional...",
+                "article_date": "2026-02-28",
+                "article_copyright_url": "https://creativecommons.org/licenses/by/4.0/",
+                "article_active": true,
+                "article_delete": false,
+                "article_created_by": 1,
+                "article_created_by_name": "Admin Sigeci",
+                "article_created_at": "2026-11-09T03:07:04.006954+00:00",
+                "article_updated_by": null,
+                "article_updated_at": null,
+                "article_attached_url": null,
+                "article_attached_version": null,
+                "attachments": []
+              },
+              {
+                "article_id": 1,
+                "article_subject": "Prueba de subida de PDF",
+                "article_description": "Artículo de prueba para subir versiones en PDF",
+                "topic_id": 7,
+                "topic_name": "Pruebas",
+                "article": "Contenido de prueba",
+                "article_date": "2026-03-15",
+                "article_copyright_url": "https://creativecommons.org/licenses/by/4.0/",
+                "article_active": true,
+                "article_delete": false,
+                "article_created_by": 16,
+                "article_created_by_name": "Autor 1",
+                "article_created_at": "2026-11-09T03:07:04.006954+00:00",
+                "article_updated_by": null,
+                "article_updated_at": null,
+                "article_attached_url": null,
+                "article_attached_version": null,
+                "attachments": []
+              }
+            ]
+          }

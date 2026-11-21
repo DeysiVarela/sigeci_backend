@@ -56,6 +56,7 @@ CREATE TABLE profile_action(
     profile_action_action VARCHAR(60) NOT NULL,      -- 'article' | 'event' | 'application'
     profile_action_visibility BOOLEAN NOT NULL DEFAULT TRUE,
     profile_action_permissions VARCHAR(60) NOT NULL, -- 'view|create|update|delete|active|inactive|download'
+    profile_action_order int NOT NULL,
     profile_active BOOLEAN NOT NULL DEFAULT TRUE,
     profile_delete BOOLEAN NOT NULL DEFAULT FALSE
 );

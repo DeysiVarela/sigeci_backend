@@ -5,7 +5,8 @@ import logging
 from functools import wraps
 from util.enum.Codes import Codes
 from django.db import connection
-from django.http import JsonResponse 
+from django.http import JsonResponse
+from rest_framework.response import Response
 
 logger = logging.getLogger(__name__)
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY")
@@ -101,5 +102,49 @@ def require_permission(endpoint: str, action: str):
                 }, status=403)
 
             return func(request, *args, **kwargs)
+        return wrapper
+    return decorator
+
+
+def require_permission_drf(endpoint: str, action: str):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(self, request, *args, **kwargs):
+            token = request.headers.get("Authorization")
+            profile = request.headers.get("profile")
+            payload = decode_token(token)
+            if not payload:
+                return Response({
+                    "message": Codes.UNAUTHORIZED.value,
+                    "success": False,
+                    "internMessage": "Token inválido o expirado"
+                }, status=401)
+            user_id         = payload.get("user_id")
+            user_seed_token = payload.get("user_seed_token")
+
+            user = {
+                "user_id":          user_id,
+                "profile_id":       profile,
+                "user_seed_token":  user_seed_token
+            }
+
+            request.user = user
+
+            if not validate_seed_token(user_id, user_seed_token):
+                return Response({
+                    "message": Codes.NOT_PERMISSION.value,
+                    "success": False,
+                    "internMessage": "Your user needs to login again",
+                    "action": "closeSession"
+                }, status=401)
+
+            if not check_permission(user_id, endpoint, action):
+                return Response({
+                    "message": Codes.NOT_PERMISSION.value,
+                    "success": False,
+                    "internMessage": "you don't have permission"
+                }, status=403)
+
+            return func(self, request, *args, **kwargs)
         return wrapper
     return decorator

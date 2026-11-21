@@ -95,7 +95,6 @@ class LoginView(APIView):
             {"access": str(refresh.access_token), "refresh": str(refresh), "user": _user_payload(user)}
         )
 
-
 class RefreshView(APIView):
     authentication_classes = []
     permission_classes = [AllowAny]
