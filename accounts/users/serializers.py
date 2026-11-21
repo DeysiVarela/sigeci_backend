@@ -24,7 +24,6 @@ def is_last_admin(user):
         .exists()
     )
 
-
 # --------------------------------------------------------------------------- #
 # Lectura
 # --------------------------------------------------------------------------- #
@@ -46,6 +45,7 @@ class UserSerializer(serializers.ModelSerializer):
     email = serializers.CharField(source="user_email", read_only=True)
     provider = serializers.CharField(source="user_provider", read_only=True)
     active = serializers.BooleanField(source="user_active", read_only=True)
+    user_seed_token = serializers.CharField(read_only=True)    
     
     # CAMBIO: Ahora devuelve un arreglo de perfiles
     profiles = ProfileSerializer(many=True, read_only=True) 
@@ -57,7 +57,7 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             "id", "name", "lastname", "email", "provider",
-            "profiles", "active", "created_at", "updated_at",
+            "profiles", "user_seed_token", "active", "created_at", "updated_at",
         ]
 
 

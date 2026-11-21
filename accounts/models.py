@@ -71,9 +71,9 @@ class User(models.Model):
     user_password = models.TextField()
     user_email = models.CharField(max_length=120, unique=True)
     user_provider = models.CharField(max_length=60, choices=PROVIDERS, default=PROVIDER_ACCOUNT)
-    
-    profiles = models.ManyToManyField(Profile, related_name="users", db_table="user_profiles")
 
+    user_seed_token = models.CharField(max_length=120, null=True, blank=True)
+    profiles = models.ManyToManyField(Profile, related_name="users", db_table="user_profiles")
     user_active = models.BooleanField(default=True)
     user_delete = models.BooleanField(default=False)
 
@@ -87,7 +87,7 @@ class User(models.Model):
         "self", null=True, blank=True, on_delete=models.SET_NULL,
         db_column="user_updated_by", related_name="+",
     )
-    user_updated_at = models.DateTimeField(auto_now=True)
+    user_updated_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = "users"

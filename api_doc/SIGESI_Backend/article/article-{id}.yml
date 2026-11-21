@@ -1,0 +1,90 @@
+info:
+  name: /article/{id}
+  type: http
+  seq: 4
+
+http:
+  method: GET
+  url: "{{url}}/article/6"
+  headers:
+    - name: Authorization
+      value: "{{token}}"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+examples:
+  - name: /article/{id}
+    request:
+      url: "{{url}}/article/6"
+      method: GET
+      headers:
+        - name: Authorization
+          value: "{{token}}"
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: date
+          value: Thu, 19 Nov 2026 22:55:25 GMT
+        - name: server
+          value: WSGIServer/0.2 CPython/3.14.6
+        - name: content-type
+          value: application/json
+        - name: x-frame-options
+          value: DENY
+        - name: content-length
+          value: "1789"
+        - name: x-content-type-options
+          value: nosniff
+        - name: referrer-policy
+          value: same-origin
+        - name: cross-origin-opener-policy
+          value: same-origin
+        - name: vary
+          value: origin
+      body:
+        type: json
+        data: |-
+          {
+            "success": true,
+            "message": "Artículo obtenido con éxito.",
+            "data": {
+              "article_id": 6,
+              "article_subject": "titulo test 1 EDIT",
+              "article_description": "test",
+              "topic_id": 3,
+              "topic_name": "Inteligencia Artificial",
+              "article": "content test",
+              "article_date": null,
+              "article_copyright_url": null,
+              "article_active": true,
+              "article_delete": false,
+              "article_created_by": null,
+              "article_created_by_name": null,
+              "article_created_at": "2026-11-19T11:58:13.078450+00:00",
+              "article_updated_by": 8,
+              "article_updated_at": "2026-11-19T12:25:21.203132+00:00",
+              "article_attached_url": "https://ycydkgkgxgghvhkiyeth.storage.supabase.co/storage/v1/s3/software/articles/af562102-2fb2-4857-8caf-a42fe2a7364d.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=d5819a0320bae6372db3ec58649e8755%2F20261119%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261119T225525Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&X-Amz-Signature=4f9a73863b2cc51bf6b76437604b44c41034c05a7bacb72f7e5b3b5b600ff043",
+              "article_attached_version": "1.0",
+              "attachments": [
+                {
+                  "article_attached_id": 8,
+                  "article_id": 6,
+                  "article_attached_url": "https://ycydkgkgxgghvhkiyeth.storage.supabase.co/storage/v1/s3/software/articles/af562102-2fb2-4857-8caf-a42fe2a7364d.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=d5819a0320bae6372db3ec58649e8755%2F20261119%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261119T225525Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&X-Amz-Signature=4f9a73863b2cc51bf6b76437604b44c41034c05a7bacb72f7e5b3b5b600ff043",
+                  "article_attached_version": "1.0",
+                  "article_attached_active": true,
+                  "article_attached_delete": false,
+                  "article_attached_created_by": null,
+                  "article_attached_created_at": "2026-11-19T11:58:13.168911+00:00",
+                  "article_attached_updated_by": null,
+                  "article_attached_updated_at": null
+                }
+              ]
+            }
+          }
