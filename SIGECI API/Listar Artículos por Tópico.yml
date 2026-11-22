@@ -1,0 +1,19 @@
+info:
+  name: Listar Artículos por Tópico
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: http://localhost:8000/api/articles/?topic=1
+  params:
+    - name: topic
+      value: "1"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -14,4 +14,5 @@ urlpatterns = [
     # de auth_api se sigue usando /health.
     path('api/', include('accounts.urls')),
     path('', include('auth_api.urls')),
+    path('api/articles/', include('article.urls')),
 ]
