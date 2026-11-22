@@ -1,0 +1,128 @@
+info:
+  name: /auth/login
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{url}}/auth/login"
+  body:
+    type: json
+    data: |-
+      {
+        "email": "daniel.bolivar.freelance@gmail.com",
+        "password": "Daniel123456.",
+        "captchaToken": "0cAFcWeA7lpGusp9jAmRuYLKizMVEu5DnJVjK0jwDiLz9IYXm4LykqBrYXVazExAMyqZQC6e4yjSarMurYtkAoJU--cAOeTgjphHLGpkUYTTooe1i5v4_m-BHPpB8u67i1ZSkcO_5pCKi90fXxouGjs8Wie3cug9YNDlUUI1NHSeUDqnN_L0mOj1jx_g5dl65dof1u8gIrYAVZuaGuS3DMDwzfCsS4BJ0dsDy31pMQxNO6sA0F9-QvzntgsVWMeVJynYnflKKKomH_dpLLhoYjKYNxpdeSflv2XG7_PO3F4q_vs005SdAHsEQGdiJ-OFJ-4tT66EEjQ3oa5GHZA2mOOZaJOeAEP8_rJVBjU_B0Gno_b7m_X-dKHU7Xe8HlV07jHOVeOnSqT9qo10MT3xiMPjcsDpPmaotvEG1crJgga5u-E1ND0c9uY2c2sTnJ49ZdGKb5DoWte34auy-RzlaPL4Rn8PYGVOPPrc_4yG_BVAhVir4F7eJNGaTOXJtgSv_Ad4UV8iOj7774idR5XYvZH_f0At_qEj69TUGtWPWsO3f-Fqn1lc1CUO39AlqYbj1-4Loa3dNX5Rc_1htl5LQRJX23rSy6WjYTjDUZUZbGDWfm5tY9WN2CUaqKu_O-GBDKoPHL5xMEASXwHhBLtTkR0PocC_4gKjiAvMgyMGh-to78GBDF5_-6oISgUHvR2obRuGKRa4WhN107jrl5vHG6qBYRCAEZFUXOURfUx6S5yJm4QYbkTzRfSdvGhl5b2qer3PCpt6JG8n6SUqFIXvzPkoqpMMei7zW-cpcXj_BMWh2QxiovAsC5NrNEq8nTGSrSrlEhTCi-R7ndVQnQ2exbsTEf85Kms8Iyam8k_w2KhfKcukY1VNOoega_K66IGBCudWT51X_Pxt91wOadrFtk4RVZJG9GgLNPXU6uok47kzmwAU0ZYCPATZDy9oPLJe8Dqgb-ATUDNtRV_LO-Pn2nUkXQtHBNassytXiIrIHp3eNzFoJYYpGOEFFQkAw62mwXmGdGw2cFCKu_os4lNI-awA6xx5jAF7oj7KCyeQBf_0FZM-9fKUiQnMxdMfE1qi2-_mjX7D5VMMvxKHIytkSzbsmapky4MS0NReM0_h0avHAyb6xH3KmgGEXc3a90m1O57sYZacydZ7W19UK38mYXkzjrLmXLDcJZlr3ErWnkTdo3WTQYugdbD0YjUN0y5csOA2iYaYo5s1zZGervOGlcMMLek87Dv4gEwxTHSJ0tmN-2T4dD4fClaAlFOvxDHujvuKt-Tnt6OgkFuwg5zUaeV5KAGLJPR7TAfroMkIqheDhqapXq5gfXmEWVZQhOFj0VZxsO_6fF5Tx_hLS4PL4qSq8c6hf2B_IxEku8izlM9OHIG980wBE9bJd9n6UE_OlOeRUqEOAx7ygPEbsPB9snNTTnTVIFMTTO5kALXTGaTX6Poe6xyT-JvbbLfaBzXGUS4ocz-hKovdeaHNZbqdl_5EHOxxtbTBTCaksEuePpDTjbco122bEzpXYv-o4AImejAvcwaEXXnU5Iu_GKocggDFhxolWL-rlx65XfInF-qY2_Hm0RkyKc-h5ba2IQnM44uthyoPF969Cqu5W7I_X28Js_2K8g3oHv9WjrXVaY8izK_pZPq1CDB2xQllPOa37mOMt2NN9PtqCSSgQHqkGtKf7kOOTgZiWoDrXviIydo2SI8aJA0yt_1SKAxl410PM1p7P1uMBtyPAOI2KXs3K9onSwsG6MAnt_PllnBtpg3XiLBd-_iYjdKXp8HIrNk_USjug5eEKpO7giiuf_90PhogFwDs7mTBnfC9-8pkZe4uYANmjZY_VPKPclPDcYA7QTvfGKzbM1y4Cv6ThpeShtqkCv6LFUETQTSJlFdGf2vj-xvuZVhqHiojz8AQnAYglCGKEq51yGEpirT7Ap_KuB_llV0-bjPxWGrwW10QLDo_b_oKA3uFaS_qFOschcbpnLxItlPPN4pzJYqhdzeSfeyhdebQCn5UETYAmgwK4rmrSfRoih0YLL3RTuMht9e01mYjsog33b0qW63VK4lTPsrCqPAfXfcAFgtk7KHZZw1-t7IY3lcvwR_0hNGKFWTu3APtgYKetNEzKfH_b7Rlz2X1VEvUFw5bgRumqOiKWDiAaypWMG6d49tB5Xz-yGwHIe237eNQhy83Q5wWxcImmcegKEwEd_NvDCCHQQ3djfjy6wRdAQvtd0qFp1DTfOpo5PXZSAvdTwI6gw2MjyNiGk2wWe_kGC3XyQBOzHMmvy4gtPPF9EedccftDcrj4ZgL3IqvPntFklzgv1-TLsutc86KEjZnZW38fc-XkHOWxg6186frCe5hz-_NIIjEiOjGoPfbITXzVXTqwv"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+examples:
+  - name: /auth/login
+    request:
+      url: "{{url}}/auth/login"
+      method: POST
+      body:
+        type: json
+        data: |-
+          {
+            "email": "daniel.bolivar.freelance@gmail.com",
+            "password": "Daniel123456.",
+            "captchaToken": "0cAFcWeA7lpGusp9jAmRuYLKizMVEu5DnJVjK0jwDiLz9IYXm4LykqBrYXVazExAMyqZQC6e4yjSarMurYtkAoJU--cAOeTgjphHLGpkUYTTooe1i5v4_m-BHPpB8u67i1ZSkcO_5pCKi90fXxouGjs8Wie3cug9YNDlUUI1NHSeUDqnN_L0mOj1jx_g5dl65dof1u8gIrYAVZuaGuS3DMDwzfCsS4BJ0dsDy31pMQxNO6sA0F9-QvzntgsVWMeVJynYnflKKKomH_dpLLhoYjKYNxpdeSflv2XG7_PO3F4q_vs005SdAHsEQGdiJ-OFJ-4tT66EEjQ3oa5GHZA2mOOZaJOeAEP8_rJVBjU_B0Gno_b7m_X-dKHU7Xe8HlV07jHOVeOnSqT9qo10MT3xiMPjcsDpPmaotvEG1crJgga5u-E1ND0c9uY2c2sTnJ49ZdGKb5DoWte34auy-RzlaPL4Rn8PYGVOPPrc_4yG_BVAhVir4F7eJNGaTOXJtgSv_Ad4UV8iOj7774idR5XYvZH_f0At_qEj69TUGtWPWsO3f-Fqn1lc1CUO39AlqYbj1-4Loa3dNX5Rc_1htl5LQRJX23rSy6WjYTjDUZUZbGDWfm5tY9WN2CUaqKu_O-GBDKoPHL5xMEASXwHhBLtTkR0PocC_4gKjiAvMgyMGh-to78GBDF5_-6oISgUHvR2obRuGKRa4WhN107jrl5vHG6qBYRCAEZFUXOURfUx6S5yJm4QYbkTzRfSdvGhl5b2qer3PCpt6JG8n6SUqFIXvzPkoqpMMei7zW-cpcXj_BMWh2QxiovAsC5NrNEq8nTGSrSrlEhTCi-R7ndVQnQ2exbsTEf85Kms8Iyam8k_w2KhfKcukY1VNOoega_K66IGBCudWT51X_Pxt91wOadrFtk4RVZJG9GgLNPXU6uok47kzmwAU0ZYCPATZDy9oPLJe8Dqgb-ATUDNtRV_LO-Pn2nUkXQtHBNassytXiIrIHp3eNzFoJYYpGOEFFQkAw62mwXmGdGw2cFCKu_os4lNI-awA6xx5jAF7oj7KCyeQBf_0FZM-9fKUiQnMxdMfE1qi2-_mjX7D5VMMvxKHIytkSzbsmapky4MS0NReM0_h0avHAyb6xH3KmgGEXc3a90m1O57sYZacydZ7W19UK38mYXkzjrLmXLDcJZlr3ErWnkTdo3WTQYugdbD0YjUN0y5csOA2iYaYo5s1zZGervOGlcMMLek87Dv4gEwxTHSJ0tmN-2T4dD4fClaAlFOvxDHujvuKt-Tnt6OgkFuwg5zUaeV5KAGLJPR7TAfroMkIqheDhqapXq5gfXmEWVZQhOFj0VZxsO_6fF5Tx_hLS4PL4qSq8c6hf2B_IxEku8izlM9OHIG980wBE9bJd9n6UE_OlOeRUqEOAx7ygPEbsPB9snNTTnTVIFMTTO5kALXTGaTX6Poe6xyT-JvbbLfaBzXGUS4ocz-hKovdeaHNZbqdl_5EHOxxtbTBTCaksEuePpDTjbco122bEzpXYv-o4AImejAvcwaEXXnU5Iu_GKocggDFhxolWL-rlx65XfInF-qY2_Hm0RkyKc-h5ba2IQnM44uthyoPF969Cqu5W7I_X28Js_2K8g3oHv9WjrXVaY8izK_pZPq1CDB2xQllPOa37mOMt2NN9PtqCSSgQHqkGtKf7kOOTgZiWoDrXviIydo2SI8aJA0yt_1SKAxl410PM1p7P1uMBtyPAOI2KXs3K9onSwsG6MAnt_PllnBtpg3XiLBd-_iYjdKXp8HIrNk_USjug5eEKpO7giiuf_90PhogFwDs7mTBnfC9-8pkZe4uYANmjZY_VPKPclPDcYA7QTvfGKzbM1y4Cv6ThpeShtqkCv6LFUETQTSJlFdGf2vj-xvuZVhqHiojz8AQnAYglCGKEq51yGEpirT7Ap_KuB_llV0-bjPxWGrwW10QLDo_b_oKA3uFaS_qFOschcbpnLxItlPPN4pzJYqhdzeSfeyhdebQCn5UETYAmgwK4rmrSfRoih0YLL3RTuMht9e01mYjsog33b0qW63VK4lTPsrCqPAfXfcAFgtk7KHZZw1-t7IY3lcvwR_0hNGKFWTu3APtgYKetNEzKfH_b7Rlz2X1VEvUFw5bgRumqOiKWDiAaypWMG6d49tB5Xz-yGwHIe237eNQhy83Q5wWxcImmcegKEwEd_NvDCCHQQ3djfjy6wRdAQvtd0qFp1DTfOpo5PXZSAvdTwI6gw2MjyNiGk2wWe_kGC3XyQBOzHMmvy4gtPPF9EedccftDcrj4ZgL3IqvPntFklzgv1-TLsutc86KEjZnZW38fc-XkHOWxg6186frCe5hz-_NIIjEiOjGoPfbITXzVXTqwv"
+          }
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: date
+          value: Thu, 19 Nov 2026 10:23:12 GMT
+        - name: server
+          value: WSGIServer/0.2 CPython/3.14.6
+        - name: content-type
+          value: application/json
+        - name: x-frame-options
+          value: DENY
+        - name: content-length
+          value: "1464"
+        - name: x-content-type-options
+          value: nosniff
+        - name: referrer-policy
+          value: same-origin
+        - name: cross-origin-opener-policy
+          value: same-origin
+        - name: vary
+          value: origin
+      body:
+        type: json
+        data: |-
+          {
+            "success": true,
+            "message": "Inicio de sesión exitoso.",
+            "data": {
+              "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzk1MDg1NTkyLCJpYXQiOjE3OTUwODM3OTIsImp0aSI6IjE3YzY5MTIwYTNjZjRhMmM4ODFkYmQxODIzNjJmYjE3IiwidXNlcl9pZCI6OCwidXNlcl9zZWVkX3Rva2VuIjoiZmIwZjgxNzYtYjM3Yi00YTUzLWE0OWItOGMwZWRiZjUyYTMwIn0.x5IFXEOwdMUBhxGeZsUHCqV7umw4s1LlvaC6mNRKTyM",
+              "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc5NTE3MDE5MiwiaWF0IjoxNzk1MDgzNzkyLCJqdGkiOiJhYjFjMWUwNTI1YTI0OTM3OGQzN2JmMDMwNTVkM2QzOCIsInVzZXJfaWQiOjgsInVzZXJfc2VlZF90b2tlbiI6ImZiMGY4MTc2LWIzN2ItNGE1My1hNDliLThjMGVkYmY1MmEzMCJ9.FJBeuOBjLXYRlm5WQSc1_Fm-mSUx2UzrHOpA2zcArX0",
+              "user": {
+                "id": 8,
+                "name": "Daniel",
+                "lastname": "Bolivar",
+                "email": "daniel.bolivar.freelance@gmail.com",
+                "provider": "ACCOUNT",
+                "profiles": [
+                  {
+                    "id": 1,
+                    "name": "ADMIN"
+                  }
+                ],
+                "user_seed_token": "fb0f8176-b37b-4a53-a49b-8c0edbf52a30",
+                "active": true,
+                "created_at": "2026-11-08T19:13:26.049330-05:00",
+                "updated_at": "2026-11-08T19:13:26.049330-05:00",
+                "permissions": {
+                  "application": [
+                    "active",
+                    "create",
+                    "delete",
+                    "download",
+                    "inactive",
+                    "update",
+                    "view"
+                  ],
+                  "article": [
+                    "active",
+                    "create",
+                    "delete",
+                    "download",
+                    "inactive",
+                    "update",
+                    "view",
+                    "view|create|update|active|inactive|delete"
+                  ],
+                  "event": [
+                    "active",
+                    "create",
+                    "delete",
+                    "inactive",
+                    "update",
+                    "view"
+                  ],
+                  "user": [
+                    "active",
+                    "create",
+                    "delete",
+                    "inactive",
+                    "update",
+                    "view"
+                  ],
+                  "user_role": [
+                    "update"
+                  ]
+                }
+              }
+            }
+          }

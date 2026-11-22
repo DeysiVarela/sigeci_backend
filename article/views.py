@@ -1,354 +1,279 @@
-import io
-import uuid
-from django.db import IntegrityError, transaction
-from django.http import HttpResponse
+import json
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
+from django.views.decorators.csrf import csrf_exempt
 from rest_framework import status
-from rest_framework.exceptions import PermissionDenied
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Article, ArticleReviewer, ArticleAttached, Topic
-from .serializers import (
-    ArticleCorrectedVersionSerializer, 
-    ArticleAttachedSerializer,
-    ArticleReorderSerializer,
-    AvalInputSerializer,
-    CorrectedVersionUploadSerializer,
-    FinalSubmissionSerializer  # <-- Nuevo para SCRUM-31
-)
-from .services import upload_file # <-- Importamos nuestro servicio
+from util.auth_service import require_permission, require_permission_drf
+from util.uploads.uploads import delete_file
+from util.utilDB import queryDB
 
-COMMITTEE_PROFILES = ("ADMIN", "MEMBER")
-BLOCKED_STATES = ("REJECTED", "FOR_PUBLICATION")
+from .models import Article, ArticleAttached, Topic
+from .serializers import ArticleReorderSerializer
 
 
-def is_committee(user):
-    """CA-03: el comité son los perfiles ADMIN y MEMBER (activos y no eliminados)."""
-    return user.profiles.filter(
-        profile_name__in=COMMITTEE_PROFILES,
-        profile_active=True,
-        profile_delete=False,
-    ).exists()
+def _parse_body(request):
+    if not request.body:
+        return {}
+    try:
+        return json.loads(request.body.decode("utf-8"))
+    except Exception:
+        return {}
 
 
-def _is_active_reviewer(user, article):
-    return ArticleReviewer.objects.filter(
-        article=article,
-        user=user,
-        article_reviewer_active=True,
-        article_reviewer_delete=False,
-    ).exists()
+def list_topics(request):
+    """Listar temas activos."""
+    topics = Topic.objects.filter(topic_active=True, topic_delete=False)
+    return JsonResponse({
+        "success": True,
+        "message": "Temas obtenidos con éxito.",
+        "data": [t.to_dict() for t in topics]
+    }, safe=False, status=200)
 
 
-# ==============================================================================
-# VISTAS DE LA SCRUM-30 (CORREGIDAS)
-# ==============================================================================
-class ArticleCorrectedVersionView(APIView):
-    """
-    GET  /api/articles/{id}/corrected-version/  (CA-01) → versión adjunta más reciente
-    POST /api/articles/{id}/corrected-version/          → el autor sube su PDF corregido
-    """
-    permission_classes = [IsAuthenticated]
+@require_permission(endpoint="article", action="view")
+def list_articles(request):
+    profile = str(request.user.get("profile_id"))
+    user = request.user.get("user_id")
+    articles = []
+    match profile:
+        case "1":
+            articles = queryDB("""
+                select 
+                    ar.*,
+                    tp.topic_subject
+                from article ar
+                inner join topic tp
+                    on tp.topic_id = ar.topic_id
+            """, None)
 
-    def get(self, request, pk):
-        article = get_object_or_404(Article, article_id=pk, article_delete=False)
-        is_author = article.article_created_by_id == request.user.pk
-        if not (is_committee(request.user) or is_author or _is_active_reviewer(request.user, article)):
-            raise PermissionDenied("No tienes permiso para ver esta versión.")
-        return Response(ArticleCorrectedVersionSerializer(article).data, status=status.HTTP_200_OK)
+        case "2":
+            articles = (
+                Article.objects
+                .select_related("topic_id", "article_created_by")
+                .prefetch_related("attachments")
+                .filter(article_active=True)
+            )
+        case "3":
+            articles = queryDB("""
+                select 
+                    ar.*,
+                    tp.topic_subject
+                from article ar
+                inner join topic tp
+                    on tp.topic_id = ar.topic_id
+                where ar.article_created_by = %s
+            """, [user])
 
-    @transaction.atomic
-    def post(self, request, pk):
-        article = get_object_or_404(Article, article_id=pk, article_delete=False)
+    return JsonResponse({
+        "success": True,
+        "message": "Artículos obtenidos con éxito.",
+        "data": articles
+    }, safe=False, status=200)
 
-        if article.article_created_by_id != request.user.pk:
-            raise PermissionDenied("Solo el autor puede subir la versión corregida.")
 
-        serializer = CorrectedVersionUploadSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+@require_permission(endpoint="article", action="view")
+def detail_article(request, article_id):
+    """Consultar detalle, actualizar o eliminar según el método HTTP."""
+    if request.method in ("PUT", "PATCH"):
+        return update_article(request, article_id)
+    if request.method == "DELETE":
+        return delete_article(request, article_id)
+    if request.method != "GET":
+        return JsonResponse({"detail": "Método no permitido.", "success": False}, status=405)
 
-        # Usa Plan A (Supabase) o Plan B (local) automáticamente
-        corrected_url = upload_file(serializer.validated_data['corrected_pdf'], "corrected_versions")
+    try:
+        article = (
+            Article.objects
+            .select_related("topic_id", "article_created_by")
+            .prefetch_related("attachments")
+            .get(pk=article_id)
+        )
+        return JsonResponse({
+            "success": True,
+            "message": "Artículo obtenido con éxito.",
+            "data": article.to_dict()
+        }, status=200)
+    except Article.DoesNotExist:
+        return JsonResponse({"detail": "Artículo no encontrado.", "success": False}, status=404)
 
-        attachment = ArticleAttached.objects.create(
-            article=article,
-            article_attached_url=corrected_url,
-            article_attached_version="Corregida",
-            article_attached_created_by=request.user,
+
+@require_permission(endpoint="article", action="create")
+def create_article(request):
+    """Crear un nuevo artículo."""
+    if request.method != "POST":
+        return JsonResponse({"detail": "Método no permitido."}, status=405)
+
+    data = _parse_body(request)
+    if not data and request.POST:
+        data = request.POST.dict()
+
+    subject = data.get("article_subject") or data.get("title")
+    content = data.get("article") or data.get("content")
+
+    if not subject or not content:
+        return JsonResponse(
+            {"detail": "Los campos 'article_subject' y 'article' son obligatorios."},
+            status=400,
         )
 
-        article.article_updated_by = request.user
-        article.article_updated_at = timezone.now()
-        article.save()
+    created_by_id = request.user.get("user_id")
 
-        return Response(
-            {
-                "detail": "Versión corregida subida correctamente.",
-                "corrected_version": ArticleAttachedSerializer(attachment).data,
-            },
-            status=status.HTTP_201_CREATED,
-        )
+    article = Article.objects.create(
+        article_subject=subject,
+        article_description=data.get("article_description", data.get("summary", "")),
+        topic_id_id=data.get("topic_id"),
+        article=content,
+        article_date=data.get("article_date") or data.get("published_at"),
+        article_created_by_id=created_by_id,
+    )
 
-
-class ArticleAvalPresentationView(APIView):
-    """POST /api/articles/{id}/aval-presentation/  (CA-02 a CA-05)"""
-    permission_classes = [IsAuthenticated]
-
-    @transaction.atomic
-    def post(self, request, pk):
-        article = get_object_or_404(Article, article_id=pk, article_delete=False)
-        inp = AvalInputSerializer(data=request.data)
-        inp.is_valid(raise_exception=True)
-
-        user = request.user
-        committee = is_committee(user)
-
-        if article.article_created_by_id == user.pk:
-            raise PermissionDenied("No puedes avalar tu propio artículo.")
-
-        row = ArticleReviewer.objects.select_for_update().filter(article=article, user=user).first()
-
-        if row is None:
-            if not committee:
-                raise PermissionDenied("Solo los miembros del comité o evaluadores asignados pueden emitir el aval.")
-            row = ArticleReviewer(article=article, user=user, article_reviewer_created_by=user)
-        elif not (row.article_reviewer_active and not row.article_reviewer_delete):
-            if not committee:
-                raise PermissionDenied("Solo los miembros del comité o evaluadores asignados pueden emitir el aval.")
-            row.article_reviewer_active = True
-            row.article_reviewer_delete = False
-            row.status = "IN_REVIEW"
-
-        if row.status in BLOCKED_STATES:
-            return Response({"detail": f"No se puede emitir aval desde el estado actual: {row.status}"}, status=status.HTTP_409_CONFLICT)
-
-        row.status = "FOR_PRESENTATION"
-        row.comment = inp.validated_data.get("comment", row.comment)
-        row.article_reviewer_updated_by = user
-        row.article_reviewer_updated_at = timezone.now()
-
-        try:
-            with transaction.atomic():
-                row.save()
-        except IntegrityError:
-            return Response({"detail": "El aval ya fue registrado por otra solicitud. Intenta de nuevo."}, status=status.HTTP_409_CONFLICT)
-
-        pdf_bytes = _build_aval_pdf(article, user)
-        response = HttpResponse(pdf_bytes, content_type="application/pdf")
-        response["Content-Disposition"] = f'attachment; filename="Aval_Articulo_{article.article_id}.pdf"'
-        response["Cache-Control"] = "no-store"
-        return response
-
-
-# ==============================================================================
-# VISTAS DE LA SCRUM-31 (NUEVAS)
-# ==============================================================================
-class ArticleFinalSubmissionView(APIView):
-    """POST /api/articles/{id}/final-submission/ (CA-01, CA-02)"""
-    permission_classes = [IsAuthenticated]
-
-    @transaction.atomic
-    def post(self, request, pk):
-        article = get_object_or_404(Article, article_id=pk, article_delete=False)
-
-        if article.article_created_by_id != request.user.pk:
-            raise PermissionDenied("Solo el autor puede subir la versión final.")
-
-        serializer = FinalSubmissionSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        final_pdf = serializer.validated_data['final_pdf']
-        copyright_pdf = serializer.validated_data['copyright_pdf']
-
-        # 1. Subir PDF Final (Usa Plan A o Plan B automáticamente)
-        final_pdf_url = upload_file(final_pdf, "final_versions")
-        
+    attached_url = data.get("article_attached_url")
+    if attached_url:
         ArticleAttached.objects.create(
             article=article,
-            article_attached_url=final_pdf_url,
-            article_attached_version="Final",
-            article_attached_created_by=request.user
+            article_attached_url=attached_url,
+            article_attached_created_by_id=created_by_id,
         )
 
-        # 2. Subir Copyright
-        copyright_url = upload_file(copyright_pdf, "copyrights")
-        
-        # 3. Guardar en el artículo
-        article.article_copyright_url = copyright_url
-        article.article_updated_by = request.user
-        article.article_updated_at = timezone.now()
-        article.save()
+    return JsonResponse({
+        "success": True,
+        "message": "Artículo creado con éxito.",
+        "data": article.to_dict(),
+    }, status=201)
 
-        return Response(
-            {"detail": "Versión final y copyright subidos correctamente.", "copyright_url": copyright_url},
-            status=status.HTTP_201_CREATED
+
+@csrf_exempt
+@require_permission(endpoint="article", action="update")
+def update_article(request, article_id):
+    """Actualizar un artículo existente."""
+    if request.method not in ("PUT", "PATCH", "POST"):
+        return JsonResponse({"detail": "Método no permitido."}, status=405)
+
+    try:
+        article = Article.objects.get(pk=article_id)
+    except Article.DoesNotExist:
+        return JsonResponse({"detail": "Artículo no encontrado."}, status=404)
+
+    data = _parse_body(request)
+    if not data and request.POST:
+        data = request.POST.dict()
+
+    if "article_subject" in data:
+        article.article_subject = data["article_subject"]
+    elif "title" in data:
+        article.article_subject = data["title"]
+
+    if "article_description" in data:
+        article.article_description = data["article_description"]
+    elif "summary" in data:
+        article.article_description = data["summary"]
+
+    if "article" in data:
+        article.article = data["article"]
+    elif "content" in data:
+        article.article = data["content"]
+
+    if "topic_id" in data:
+        article.topic_id_id = data["topic_id"]
+
+    if "article_date" in data:
+        article.article_date = data["article_date"]
+
+    updated_by_id = data.get("article_updated_by") or (
+        request.user.get("user_id") if isinstance(request.user, dict) else None
+    )
+    if updated_by_id:
+        article.article_updated_by_id = updated_by_id
+    article.article_updated_at = timezone.now()
+
+    attached_url = data.get("article_attached_url") or data.get("pdf_url") or data.get("file_url")
+    if attached_url:
+        existing_attachments = article.attachments.filter(
+            article_attached_active=True,
+            article_attached_delete=False,
         )
+        for att in existing_attachments:
+            if att.article_attached_url and att.article_attached_url != attached_url:
+                delete_file(att.article_attached_url)
+
+        latest_att = existing_attachments.first()
+        if latest_att:
+            latest_att.article_attached_url = attached_url
+            if updated_by_id:
+                latest_att.article_attached_updated_by_id = updated_by_id
+            latest_att.article_attached_updated_at = timezone.now()
+            latest_att.save()
+        else:
+            ArticleAttached.objects.create(
+                article=article,
+                article_attached_url=attached_url,
+                article_attached_created_by_id=updated_by_id,
+            )
+
+    article.save()
+    return JsonResponse({
+        "success": True,
+        "message": "Artículo actualizado con éxito.",
+        "data": article.to_dict(),
+    }, status=200)
 
 
-class ArticleAvalPublicationView(APIView):
-    """POST /api/articles/{id}/aval-publication/ (CA-03 a CA-06)"""
-    permission_classes = [IsAuthenticated]
+@csrf_exempt
+@require_permission(endpoint="article", action="delete")
+def delete_article(request, article_id):
+    """Eliminar un artículo."""
+    if request.method not in ("DELETE", "POST"):
+        return JsonResponse({"detail": "Método no permitido."}, status=405)
 
-    @transaction.atomic
-    def post(self, request, pk):
-        article = get_object_or_404(Article, article_id=pk, article_delete=False)
-        user = request.user
-        
-        if article.article_created_by_id == user.pk:
-            raise PermissionDenied("No puedes avalar tu propio artículo.")
-
-        committee = is_committee(user)
-        row = ArticleReviewer.objects.select_for_update().filter(article=article, user=user).first()
-
-        if not committee and not row:
-            raise PermissionDenied("Solo el comité o revisores asignados pueden dar el aval de publicación.")
-
-        if not article.article_copyright_url:
-            return Response({"detail": "El autor aún no ha subido el documento de copyright."}, status=status.HTTP_400_BAD_REQUEST)
-
-        if row:
-            row.status = "FOR_PUBLICATION"
-            row.article_reviewer_updated_by = user
-            row.article_reviewer_updated_at = timezone.now()
-            row.save()
-
-        if not article.verification_code:
-            article.verification_code = uuid.uuid4()
-        #article.is_eligible_for_proceedings = True
-        article.article_updated_by = user
-        article.article_updated_at = timezone.now()
-        article.save()
-
-        pdf_bytes = _build_publication_pdf(article, user)
-        response = HttpResponse(pdf_bytes, content_type="application/pdf")
-        response["Content-Disposition"] = f'attachment; filename="Certificado_Publicacion_{article.article_id}.pdf"'
-        return response
+    try:
+        article = Article.objects.get(pk=article_id)
+        article.delete()
+        return JsonResponse({"detail": "Artículo eliminado exitosamente."}, status=200)
+    except Article.DoesNotExist:
+        return JsonResponse({"detail": "Artículo no encontrado."}, status=404)
 
 
 # ==============================================================================
-# FUNCIONES GENERADORAS DE PDF
+# VISTAS DE LA SCRUM-176 (ARTÍCULOS POR TÓPICO Y REORDENAMIENTO)
 # ==============================================================================
-def _build_aval_pdf(article, issuer):
-    """Genera la constancia de presentación en memoria (SCRUM-30)."""
-    buffer = io.BytesIO()
-    p = canvas.Canvas(buffer, pagesize=letter)
-
-    p.setFont("Helvetica-Bold", 18)
-    p.drawCentredString(300, 750, "SIGECI - Constancia de Aval")
-
-    p.setFont("Helvetica", 12)
-    author = article.article_created_by
-    author_name = f"{author.user_name} {author.user_lastname}".strip() if author else "Desconocido"
-    subject = article.article_subject
-    if len(subject) > 60:
-        subject = subject[:60] + "..."
-
-    p.drawString(100, 680, f"Artículo ID: {article.article_id}")
-    p.drawString(100, 660, f"Título: {subject}")
-    p.drawString(100, 640, f"Autor: {author_name}")
-    p.line(100, 620, 500, 620)
-
-    p.drawString(100, 590, "Por medio de la presente, se certifica que el artículo ha sido")
-    p.drawString(100, 575, "evaluado y cuenta con el AVAL PARA PRESENTACIÓN en el evento.")
-
-    p.setFont("Helvetica-Bold", 12)
-    p.drawString(100, 520, f"Evaluador: {issuer.user_name} {issuer.user_lastname}")
-    issued = timezone.localtime(timezone.now()).strftime("%Y-%m-%d %H:%M")
-    p.drawString(100, 500, f"Fecha de emisión: {issued}")
-
-    p.showPage()
-    p.save()
-    return buffer.getvalue()
-
-
-def _build_publication_pdf(article, issuer):
-    """Genera el certificado formal de publicación (CA-05 SCRUM-31)."""
-    buffer = io.BytesIO()
-    p = canvas.Canvas(buffer, pagesize=letter)
-
-    p.setFont("Helvetica-Bold", 18)
-    p.drawCentredString(300, 750, "SIGECI - Certificado de Publicación")
-
-    p.setFont("Helvetica", 12)
-    author = article.article_created_by
-    author_name = f"{author.user_name} {author.user_lastname}".strip() if author else "Desconocido"
-    subject = article.article_subject
-    if len(subject) > 60:
-        subject = subject[:60] + "..."
-
-    p.drawString(100, 680, f"Artículo ID: {article.article_id}")
-    p.drawString(100, 660, f"Título: {subject}")
-    p.drawString(100, 640, f"Autor: {author_name}")
-    p.drawString(100, 620, f"Código de Verificación: {article.verification_code}")
-    
-    p.line(100, 600, 500, 600)
-
-    p.drawString(100, 570, "Por medio de la presente, se certifica que el artículo ha sido")
-    p.drawString(100, 555, "formalmente AVALADO PARA PUBLICACIÓN en las memorias del evento.")
-
-    p.setFont("Helvetica-Bold", 12)
-    p.drawString(100, 500, f"Emitido por: {issuer.user_name} {issuer.user_lastname}")
-    issued = timezone.localtime(timezone.now()).strftime("%Y-%m-%d %H:%M")
-    p.drawString(100, 480, f"Fecha de emisión: {issued}")
-
-    p.showPage()
-    p.save()
-    return buffer.getvalue()
-
 class ArticleReorderView(APIView):
     """
-    POST /api/articles/reorder/
+    POST /api/v1/article/reorder/
     Recibe una lista de IDs en el nuevo orden y actualiza la base de datos.
     """
-    permission_classes = [IsAuthenticated]
-
+    @require_permission_drf(endpoint="article", action="update")
     def post(self, request):
-        # Validamos que el usuario sea del comité (ADMIN o MEMBER)
-        if not is_committee(request.user):
-            raise PermissionDenied("Solo el comité puede organizar el orden de los artículos.")
-
         serializer = ArticleReorderSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        
         ordered_ids = serializer.validated_data['ordered_ids']
 
-        # Actualizamos el orden de cada artículo
         for index, article_id in enumerate(ordered_ids):
-            try:
-                article = Article.objects.get(article_id=article_id)
-                article.article_order = index # Guardamos la posición (0, 1, 2...)
-                article.save()
-            except Article.DoesNotExist:
-                pass 
+            Article.objects.filter(article_id=article_id).update(article_order=index)
 
         return Response({"detail": "Orden actualizado correctamente."}, status=status.HTTP_200_OK)
 
+
 class ArticleByTopicListView(APIView):
     """
-    GET /api/articles/topics/{topic_id}/articles/
+    GET /api/v1/article/topics/{topic_id}/articles/
     Lista los artículos de un tópico específico.
     """
-    permission_classes = [IsAuthenticated]
-
+    @require_permission_drf(endpoint="article", action="view")
     def get(self, request, topic_id):
-        # Validar que el tópico exista
         topic = get_object_or_404(Topic, topic_id=topic_id, topic_active=True, topic_delete=False)
-        
-        # ORM: Traer los artículos del tópico, ordenados por 'article_order'
         articles = Article.objects.filter(
-            topic_id=topic, 
-            article_active=True, 
+            topic_id=topic,
+            article_active=True,
             article_delete=False
         ).order_by('article_order')
 
-        # Retornar los datos usando el método to_dict() que ya tienes
         return Response({
             "success": True,
             "message": f"Artículos del tópico {topic.topic_subject} obtenidos.",
             "data": [a.to_dict() for a in articles]
         }, status=200)
+        

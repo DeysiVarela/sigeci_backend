@@ -1,16 +1,24 @@
-from django.urls import path
-from . import views
+from django.urls import path, re_path
+from .views import (
+    list_articles,
+    list_topics,
+    create_article,
+    detail_article,
+    update_article,
+    delete_article,
+    ArticleByTopicListView,
+    ArticleReorderView,
+)
 
 urlpatterns = [
-    # Ruta para el Drag & Drop (SCRUM-176)
-    path('topics/<int:topic_id>/articles/', views.ArticleByTopicListView.as_view(), name='articles-by-topic'),
-    path('reorder/', views.ArticleReorderView.as_view(), name='article-reorder'),
-    
-    # Rutas SCRUM-30
-    path('<int:pk>/corrected-version/', views.ArticleCorrectedVersionView.as_view(), name='article-corrected-version'),
-    path('<int:pk>/aval-presentation/', views.ArticleAvalPresentationView.as_view(), name='article-aval-presentation'),
-    
-    # Rutas SCRUM-31
-    path('<int:pk>/final-submission/', views.ArticleFinalSubmissionView.as_view(), name='article-final-submission'),
-    path('<int:pk>/aval-publication/', views.ArticleAvalPublicationView.as_view(), name='article-aval-publication'),
+    re_path(r"^topic/?$", list_topics, name='topic-list'),
+    re_path(r"^article/?$", list_articles, name='article-list'),
+    re_path(r"^article/create/?$", create_article, name='article-create'),
+    re_path(r"^article/(?P<article_id>\d+)/?$", detail_article, name='article-detail'),
+    re_path(r"^article/(?P<article_id>\d+)/update/?$", update_article, name='article-update'),
+    re_path(r"^article/(?P<article_id>\d+)/delete/?$", delete_article, name='article-delete'),
+
+    # Rutas SCRUM-176 (Artículos por tópico y reordenamiento)
+    re_path(r"^article/topics/(?P<topic_id>\d+)/articles/?$", ArticleByTopicListView.as_view(), name='articles-by-topic'),
+    re_path(r"^article/reorder/?$", ArticleReorderView.as_view(), name='article-reorder'),
 ]
