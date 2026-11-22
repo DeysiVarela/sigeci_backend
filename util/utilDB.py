@@ -8,5 +8,5 @@ def queryDB(query_string, params = None):
             cursor.execute(query_string, params)
         columns = [col[0] for col in cursor.description]
         rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
-        print("rows", rows)
+        # print("rows", rows)
         return rows

@@ -31,8 +31,6 @@ def list_topics(request):
 
 @require_permission(endpoint="article", action="view")
 def list_articles(request):
-    print(request.user, "====")
-
     #  switch por perfiles
     profile = str(request.user.get("profile_id"))
     user = request.user.get("user_id")
@@ -47,9 +45,6 @@ def list_articles(request):
                 inner join topic tp
                     on tp.topic_id = ar.topic_id
             """, None)
-            
-
-            print("tu perfil", 1)
 
         case "2":
             articles = (

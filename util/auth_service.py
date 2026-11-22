@@ -53,9 +53,9 @@ def check_permission(user_id, endpoint, action):
             [user_id, endpoint]
         )
         row = cursor.fetchone()
-        print("row", row)
+        # print("row", row)
         permissions = row[0].split("|")
-        print("permissions", permissions)
+        # print("permissions", permissions)
         # create|view|update
         if action in permissions:
             return True

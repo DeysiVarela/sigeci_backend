@@ -9,6 +9,8 @@ http:
   headers:
     - name: Authorization
       value: "{{token}}"
+    - name: profile
+      value: "1"
   auth: inherit
 
 settings:
