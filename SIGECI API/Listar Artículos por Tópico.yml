@@ -5,12 +5,10 @@ info:
 
 http:
   method: GET
-  url: http://localhost:8000/api/articles/?topic=1
-  params:
-    - name: topic
-      value: "1"
-      type: query
-  auth: inherit
+  url: http://localhost:8000/api/articles/topics/3/articles/
+  auth:
+    type: bearer
+    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzk1MzEyMjI4LCJpYXQiOjE3OTUzMTA0MjgsImp0aSI6ImQ3NmZmNGIxZDg5NTQyZWY4MjYwOWVlZDY4MmEwNTM3IiwidXNlcl9pZCI6IjEifQ.JefQ6OuEJlRoVUIv8TRanYT94rKqi4xuGd9kixdg5VI
 
 settings:
   encodeUrl: true
