@@ -1,13 +1,18 @@
 import json
 from django.http import JsonResponse
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from django.db import connection
-from util.utilDB import queryDB
 from django.views.decorators.csrf import csrf_exempt
-from util.auth_service import require_permission
+from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from util.auth_service import require_permission, require_permission_drf
 from util.uploads.uploads import delete_file
+from util.utilDB import queryDB
 
 from .models import Article, ArticleAttached, Topic
+from .serializers import ArticleReorderSerializer
 
 
 def _parse_body(request):
@@ -31,7 +36,6 @@ def list_topics(request):
 
 @require_permission(endpoint="article", action="view")
 def list_articles(request):
-    #  switch por perfiles
     profile = str(request.user.get("profile_id"))
     user = request.user.get("user_id")
     articles = []
@@ -232,3 +236,49 @@ def delete_article(request, article_id):
     except Article.DoesNotExist:
         return JsonResponse({"detail": "Artículo no encontrado."}, status=404)
 
+
+# ==============================================================================
+# VISTAS DE LA SCRUM-176 (ARTÍCULOS POR TÓPICO Y REORDENAMIENTO)
+# ==============================================================================
+class ArticleReorderView(APIView):
+    """
+    POST /api/v1/article/reorder/
+    Recibe una lista de IDs en el nuevo orden y actualiza la base de datos.
+    """
+    authentication_classes = []
+    permission_classes = []
+
+    @require_permission_drf(endpoint="article", action="update")
+    def post(self, request):
+        serializer = ArticleReorderSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        ordered_ids = serializer.validated_data['ordered_ids']
+
+        for index, article_id in enumerate(ordered_ids):
+            Article.objects.filter(article_id=article_id).update(article_order=index)
+
+        return Response({"detail": "Orden actualizado correctamente."}, status=status.HTTP_200_OK)
+
+
+class ArticleByTopicListView(APIView):
+    """
+    GET /api/v1/article/topics/{topic_id}/articles/
+    Lista los artículos de un tópico específico.
+    """
+    authentication_classes = []
+    permission_classes = []
+
+    @require_permission_drf(endpoint="article", action="view")
+    def get(self, request, topic_id):
+        topic = get_object_or_404(Topic, topic_id=topic_id, topic_active=True, topic_delete=False)
+        articles = Article.objects.filter(
+            topic_id=topic,
+            article_active=True,
+            article_delete=False
+        ).order_by('article_order')
+
+        return Response({
+            "success": True,
+            "message": f"Artículos del tópico {topic.topic_subject} obtenidos.",
+            "data": [a.to_dict() for a in articles]
+        }, status=200)

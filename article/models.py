@@ -64,6 +64,7 @@ class Article(models.Model):
     article_copyright_url = models.URLField(blank=True, null=True)
     article_active = models.BooleanField(default=True)
     article_delete = models.BooleanField(default=False)
+    article_order = models.IntegerField(default=0)
 
     # Campos de auditoría
     article_created_by = models.ForeignKey(
@@ -115,6 +116,7 @@ class Article(models.Model):
             "article_copyright_url": self.article_copyright_url,
             "article_active": self.article_active,
             "article_delete": self.article_delete,
+            "article_order": self.article_order,
             "article_created_by": self.article_created_by_id,
             "article_created_by_name": created_by_name,
             "article_created_at": self.article_created_at.isoformat() if self.article_created_at else None,

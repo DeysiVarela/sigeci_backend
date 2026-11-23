@@ -88,10 +88,8 @@ INSTALLED_APPS = [
     'uploads',
     'accounts',
     'auth_api',
-    'notifications',
-    'Login',
     'article',
-    'dashboard',
+    'notifications',
 ]
 
 MIDDLEWARE = [
