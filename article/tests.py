@@ -8,46 +8,71 @@ from accounts.models import Profile, User
 from .models import Article, ArticleAttached, ArticleReviewer, Topic
 
 
+@override_settings(CAPTCHA_REQUIRED=False)
 class ArticleCrudTests(TestCase):
     def setUp(self):
         self.client = Client()
+        call_command("seed_accounts")
+        self.topic = Topic.objects.create(topic_subject="Inteligencia Artificial")
+        admin_profile = Profile.objects.get(profile_name="ADMIN")
+        self.admin = User(
+            user_name="Admin",
+            user_lastname="SIGECI",
+            user_email="admin.article@test.local",
+        )
+        self.admin.set_password("Clave.Segura1")
+        self.admin.save()
+        self.admin.profiles.add(admin_profile)
+        login = self.client.post(
+            "/api/auth/login/",
+            {"email": self.admin.user_email, "password": "Clave.Segura1"},
+            content_type="application/json",
+        )
+        self.assertEqual(login.status_code, 200)
+        self.access = login.json()["access"]
+        self.auth_headers = {
+            "HTTP_AUTHORIZATION": f"Bearer {self.access}",
+            "HTTP_PROFILE": str(admin_profile.profile_id),
+        }
         self.article = Article.objects.create(
             article_subject="IA en la Medicina",
             article_description="Investigación de modelos convolucionales",
-            topic_id=1,
+            topic_id=self.topic,
             article="Contenido completo del artículo científico.",
             article_date="2026-03-15",
+            article_created_by=self.admin,
         )
 
     def test_list_articles(self):
-        response = self.client.get("/api/v1/articles/")
+        response = self.client.get("/api/v1/article/", **self.auth_headers)
         self.assertEqual(response.status_code, 200)
         data = response.json()
-        self.assertEqual(len(data), 1)
-        self.assertEqual(data[0]["article_subject"], "IA en la Medicina")
+        articles = data["data"]
+        self.assertTrue(any(a["article_subject"] == "IA en la Medicina" for a in articles))
 
     def test_detail_article(self):
-        response = self.client.get(f"/api/v1/articles/{self.article.article_id}/")
+        response = self.client.get(f"/api/v1/article/{self.article.article_id}/", **self.auth_headers)
         self.assertEqual(response.status_code, 200)
         data = response.json()
-        self.assertEqual(data["article_id"], self.article.article_id)
+        self.assertEqual(data["data"]["article_id"], self.article.article_id)
 
     def test_create_article_via_method_url(self):
         payload = {
             "article_subject": "Seguridad Informática",
             "article_description": "Criptografía asimétrica",
-            "topic_id": 2,
+            "topic_id": self.topic.topic_id,
             "article": "Cuerpo del documento técnico.",
             "article_date": "2026-04-01",
         }
         response = self.client.post(
-            "/api/v1/articles/create/",
+            "/api/v1/article/create/",
             data=json.dumps(payload),
             content_type="application/json",
+            **self.auth_headers,
         )
         self.assertEqual(response.status_code, 201)
         data = response.json()
-        self.assertEqual(data["article_subject"], "Seguridad Informática")
+        self.assertEqual(data["data"]["article_subject"], "Seguridad Informática")
         self.assertTrue(Article.objects.filter(article_subject="Seguridad Informática").exists())
 
     def test_update_article_via_method_url(self):
@@ -55,16 +80,20 @@ class ArticleCrudTests(TestCase):
             "article_subject": "IA en Medicina Actualizada",
         }
         response = self.client.post(
-            f"/api/v1/articles/{self.article.article_id}/update/",
+            f"/api/v1/article/{self.article.article_id}/update/",
             data=json.dumps(payload),
             content_type="application/json",
+            **self.auth_headers,
         )
         self.assertEqual(response.status_code, 200)
         self.article.refresh_from_db()
         self.assertEqual(self.article.article_subject, "IA en Medicina Actualizada")
 
     def test_delete_article_via_method_url(self):
-        response = self.client.post(f"/api/v1/articles/{self.article.article_id}/delete/")
+        response = self.client.post(
+            f"/api/v1/article/{self.article.article_id}/delete/",
+            **self.auth_headers,
+        )
         self.assertEqual(response.status_code, 200)
         self.assertFalse(Article.objects.filter(pk=self.article.article_id).exists())
 
@@ -106,10 +135,10 @@ class EvaluationAssignmentTests(APITestCase):
             user_name="Jur",
             user_lastname="ado",
             user_email=email,
-            profile=Profile.objects.get(profile_name=profile_name),
         )
         user.set_password("Clave.Segura1")
         user.save()
+        user.profiles.add(Profile.objects.get(profile_name=profile_name))
         return user
 
     def authenticate(self, user):
