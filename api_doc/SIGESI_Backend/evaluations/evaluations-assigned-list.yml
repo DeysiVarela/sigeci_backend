@@ -1,0 +1,88 @@
+info:
+  name: Bandeja de evaluaciones asignadas
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{evaluationUrl}}/evaluations/assigned/"
+  headers:
+    - name: Authorization
+      value: "Bearer {{token}}"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+docs: |-
+  Requiere el permiso "evaluation:view" en la matriz ProfileAction.
+  Devuelve únicamente las evaluaciones asignadas al jurado autenticado.
+
+  Respuesta 200:
+  [
+    {
+      "id": 1,
+      "articleId": 20,
+      "title": "Título del artículo",
+      "author": "Nombre del autor",
+      "category": "Inteligencia Artificial",
+      "summary": "Resumen",
+      "deadline": "2026-12-01",
+      "status": "PENDIENTE",
+      "comments": "",
+      "verdict": "PENDIENTE",
+      "pdfSignedUrl": "https://...",
+      "pdfFileName": "articulo.pdf"
+    }
+  ]
+
+examples:
+  - name: éxito
+    request:
+      url: "{{evaluationUrl}}/evaluations/assigned/"
+      method: GET
+      headers:
+        - name: Authorization
+          value: "Bearer {{token}}"
+    response:
+      status: 200
+      statusText: OK
+      body:
+        type: json
+        data: |-
+          [
+            {
+              "id": 1,
+              "articleId": 20,
+              "title": "Artículo asignado",
+              "author": "Ana Pérez",
+              "category": "Inteligencia Artificial",
+              "summary": "Resumen científico",
+              "deadline": "2026-12-01",
+              "status": "PENDIENTE",
+              "comments": "",
+              "verdict": "PENDIENTE",
+              "pdfSignedUrl": "https://storage.example.test/signed-article.pdf",
+              "pdfFileName": "signed-article.pdf"
+            }
+          ]
+  - name: usuario sin perfil MEMBER
+    request:
+      url: "{{evaluationUrl}}/evaluations/assigned/"
+      method: GET
+      headers:
+        - name: Authorization
+          value: "Bearer {{token}}"
+    response:
+      status: 403
+      statusText: Forbidden
+      body:
+        type: json
+        data: |-
+          {
+            "detail": "Solo los miembros del Comité Científico pueden consultar evaluaciones."
+          }

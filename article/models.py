@@ -216,6 +216,7 @@ class ArticleReviewer(models.Model):
     )
     status = models.CharField(max_length=50, choices=STATUS_CHOICES, default="IN_REVIEW")
     comment = models.TextField(blank=True, null=True)
+    evaluation_deadline = models.DateField(null=True, blank=True)
     article_reviewer_active = models.BooleanField(default=True)
     article_reviewer_delete = models.BooleanField(default=False)
 

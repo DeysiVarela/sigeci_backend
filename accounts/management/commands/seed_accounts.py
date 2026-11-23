@@ -23,6 +23,7 @@ MATRIX = {
         "article": ["view", "download"],
         "event": ["view"],
         "application": ["view"],
+        "evaluation": ["view", "update"],
     },
     "AUTHOR": {
         "article": ["view", "create", "update", "download"],
