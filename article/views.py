@@ -245,6 +245,9 @@ class ArticleReorderView(APIView):
     POST /api/v1/article/reorder/
     Recibe una lista de IDs en el nuevo orden y actualiza la base de datos.
     """
+    authentication_classes = []
+    permission_classes = []
+
     @require_permission_drf(endpoint="article", action="update")
     def post(self, request):
         serializer = ArticleReorderSerializer(data=request.data)
@@ -262,6 +265,9 @@ class ArticleByTopicListView(APIView):
     GET /api/v1/article/topics/{topic_id}/articles/
     Lista los artículos de un tópico específico.
     """
+    authentication_classes = []
+    permission_classes = []
+
     @require_permission_drf(endpoint="article", action="view")
     def get(self, request, topic_id):
         topic = get_object_or_404(Topic, topic_id=topic_id, topic_active=True, topic_delete=False)
@@ -276,4 +282,3 @@ class ArticleByTopicListView(APIView):
             "message": f"Artículos del tópico {topic.topic_subject} obtenidos.",
             "data": [a.to_dict() for a in articles]
         }, status=200)
-        

@@ -1,4 +1,3 @@
-
 import jwt
 import os
 import logging
@@ -26,10 +25,16 @@ def decode_token(token_header):
 # Validar seed Token
 def validate_seed_token(user_id, user_seed_token):
     with connection.cursor() as cursor:
-        cursor.execute(
-            "SELECT 1 FROM users WHERE user_id = %s AND user_seed_token = %s",
-            [user_id, user_seed_token]
-        )
+        if user_seed_token is None:
+            cursor.execute(
+                "SELECT 1 FROM users WHERE user_id = %s AND user_seed_token IS NULL",
+                [user_id]
+            )
+        else:
+            cursor.execute(
+                "SELECT 1 FROM users WHERE user_id = %s AND user_seed_token = %s",
+                [user_id, user_seed_token]
+            )
         row = cursor.fetchone()
         return bool(row and row[0])
 
@@ -53,9 +58,9 @@ def check_permission(user_id, endpoint, action):
             [user_id, endpoint]
         )
         row = cursor.fetchone()
-        # print("row", row)
+        if not row or not row[0]:
+            return False
         permissions = row[0].split("|")
-        # print("permissions", permissions)
         # create|view|update
         if action in permissions:
             return True
