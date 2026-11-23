@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('article', '0005_remove_article_is_eligible_for_proceedings'),
+        ('article', '0002_article_article_delete_and_more'),
     ]
 
     operations = [

@@ -88,6 +88,7 @@ INSTALLED_APPS = [
     'uploads',
     'accounts',
     'auth_api',
+    'article',
     'notifications',
 ]
 
