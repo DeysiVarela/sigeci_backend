@@ -52,7 +52,7 @@ def _resend_key(email):
 def _eligible_user(email):
     """Cuenta que puede iniciar sesión / recuperar clave con contraseña."""
     return (
-        User.objects.select_related("profile")
+        User.objects.prefetch_related("profiles")
         .filter(
             user_email__iexact=email.strip(),
             user_active=True,
@@ -94,7 +94,6 @@ class LoginView(APIView):
         return Response(
             {"access": str(refresh.access_token), "refresh": str(refresh), "user": _user_payload(user)}
         )
-
 
 class RefreshView(APIView):
     authentication_classes = []
@@ -176,12 +175,12 @@ class RegisterView(APIView):
             user_lastname=data["lastname"],
             user_email=data["email"],
             user_provider=User.PROVIDER_ACCOUNT,
-            profile=author,  # forzado: nunca viene de la petición
         )
         user.set_password(data["password"])  # hash de Django (PBKDF2); nunca se guarda ni se registra en claro
         try:
             with transaction.atomic():
                 user.save()
+                user.profiles.add(author) 
         except IntegrityError:  # dos registros simultáneos con el mismo correo
             return Response(EMAIL_TAKEN, status=status.HTTP_409_CONFLICT)
 

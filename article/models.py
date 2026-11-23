@@ -1,4 +1,5 @@
 from django.db import models
+from util.uploads.uploads import generate_download_url
 
 
 class Topic(models.Model):
@@ -63,6 +64,7 @@ class Article(models.Model):
     article_copyright_url = models.URLField(blank=True, null=True)
     article_active = models.BooleanField(default=True)
     article_delete = models.BooleanField(default=False)
+    article_order = models.IntegerField(default=0)
 
     # Campos de auditoría
     article_created_by = models.ForeignKey(
@@ -92,20 +94,37 @@ class Article(models.Model):
         return f"{self.article_id}: {self.article_subject}"
 
     def to_dict(self):
+        created_by_name = None
+        if self.article_created_by_id and self.article_created_by:
+            full_name = f"{self.article_created_by.user_name} {self.article_created_by.user_lastname}".strip()
+            created_by_name = full_name or self.article_created_by.user_email
+
+        attachments_qs = self.attachments.filter(
+            article_attached_active=True,
+            article_attached_delete=False,
+        )
+        latest_attachment = attachments_qs.first()
+
         return {
             "article_id": self.article_id,
             "article_subject": self.article_subject,
             "article_description": self.article_description,
             "topic_id": self.topic_id_id,
+            "topic_name": self.topic_id.topic_subject if self.topic_id_id and self.topic_id else None,
             "article": self.article,
             "article_date": str(self.article_date) if self.article_date else None,
             "article_copyright_url": self.article_copyright_url,
             "article_active": self.article_active,
             "article_delete": self.article_delete,
+            "article_order": self.article_order,
             "article_created_by": self.article_created_by_id,
+            "article_created_by_name": created_by_name,
             "article_created_at": self.article_created_at.isoformat() if self.article_created_at else None,
             "article_updated_by": self.article_updated_by_id,
             "article_updated_at": self.article_updated_at.isoformat() if self.article_updated_at else None,
+            "article_attached_url": generate_download_url(latest_attachment.article_attached_url) if latest_attachment else None,
+            "article_attached_version": latest_attachment.article_attached_version if latest_attachment else None,
+            "attachments": [att.to_dict() for att in attachments_qs],
         }
 
 
@@ -153,7 +172,7 @@ class ArticleAttached(models.Model):
         return {
             "article_attached_id": self.article_attached_id,
             "article_id": self.article_id,
-            "article_attached_url": self.article_attached_url,
+            "article_attached_url": generate_download_url(self.article_attached_url),
             "article_attached_version": self.article_attached_version,
             "article_attached_active": self.article_attached_active,
             "article_attached_delete": self.article_attached_delete,

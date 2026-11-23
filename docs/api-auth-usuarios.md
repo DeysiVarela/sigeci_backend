@@ -96,6 +96,23 @@ Campos: `name`, `lastname`, `email`, `profile`, `active`. La contraseña no se e
 ### `GET /api/profiles/` — permiso `user:view`
 `200 [ { id, name } ]` (roles activos, para los selectores).
 
+### `GET /api/users/me` y `PATCH /api/users/me` — mi perfil (SCRUM-125)
+Requieren estar autenticado, **no** piden permisos de la matriz (cada usuario gestiona su propio perfil) y solo operan sobre el usuario de la sesión: no reciben ningún id. Funcionan con o sin `/` final. `PUT` y `DELETE` responden `405`.
+- `GET` → `200` con la misma forma que `/api/auth/me/`: `{ id, name, lastname, email, provider, profile, profile_name, active, created_at, updated_at, permissions }`.
+- `PATCH` (parcial) acepta `name` (≤60), `lastname` (≤60) y `email` (≤120, único sin distinguir mayúsculas; se puede enviar el propio). **El rol, el estado, el proveedor y la contraseña no se pueden cambiar aquí: esas claves se descartan.** → `200` con el usuario actualizado (misma forma que el `GET`, incluidos los permisos) · `400` errores por campo.
+- La pantalla de perfil solo maneja nombre, apellido y correo, que son los datos que guarda el modelo.
+
+### `PUT /api/users/me/password/` — cambiar mi contraseña (SCRUM-125)
+Cuerpo: `{ "currentPassword", "newPassword" }`. La confirmación se valida en la pantalla; si llega `confirmPassword`, se ignora. Límite: 5 intentos por minuto por usuario (`429`).
+
+| Código | Respuesta |
+|---|---|
+| 200 | `{"detail": "Contraseña actualizada."}` |
+| 400 | `currentPassword` incorrecta (es **400 y no 401** para que el frontend no cierre la sesión), `newPassword` que no cumple las reglas o igual a la actual, o cuenta sin contraseña propia (proveedor distinto de ACCOUNT) |
+| 401 | sin token válido |
+
+Efectos: la contraseña se cifra con el hash de Django (PBKDF2-SHA256) y los PIN de recuperación pendientes dejan de servir. Los tokens ya emitidos siguen vigentes hasta su vencimiento (no hay lista de revocación).
+
 ## 4. Matriz de permisos inicial (`seed_accounts`)
 Recursos de este alcance: `user` y `user_role`. Los de `article`, `event` y `application` son **supuestos provisionales** de otros módulos.
 

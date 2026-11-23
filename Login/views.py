@@ -4,6 +4,8 @@ import math
 import secrets
 import time
 from datetime import timedelta
+from util.auth_service import require_permission
+from util.utilDB import queryDB
 
 from util.enum.Codes import Codes
 
@@ -74,7 +76,6 @@ def login(request):
     refresh         = RefreshToken.for_user(user)
 
     refresh["user_id"]          = user.user_id
-    refresh["profile_id"]       = user.profile_id
     refresh["user_seed_token"]  = user.user_seed_token
 
     access_token    = str(refresh.access_token)
@@ -93,6 +94,7 @@ def login(request):
 
 
 @csrf_exempt
+@require_permission(endpoint="me", action="view")
 def me(request):
     """
     GET /api/v1/auth/me
@@ -101,33 +103,24 @@ def me(request):
     if request.method != "GET":
         return JsonResponse({"detail": "Método no permitido.", "success": False}, status=405)
 
-    token = request.headers.get("Authorization")
-    if not token:
-        return JsonResponse({
-            "success": False,
-            "message": "Token de autenticación requerido.",
-            "action": "closeSession"
-        }, status=401)
+    # ejecutar peticion a permisos para renderizar menu
+    profile = request.user.get("profile_id")
 
-    raw_token = token.split(" ")[1] if token.startswith("Bearer ") else token
+    menu = queryDB("""
+        select
+            *
+        from profile_action pa 
+        inner join profile pr
+            on pr.profile_id = pa.profile_id
+            and pr.profile_active = true
+            and pr.profile_delete = false
+        where 
+            pa.profile_id = %s
+            and pa.profile_action_active = true
+            and pa.profile_action_delete = false
+    """, [profile])
 
-    try:
-        from rest_framework_simplejwt.tokens import AccessToken
-        token_obj = AccessToken(raw_token)
-        user_id = token_obj["user_id"]
-        user = User.objects.select_related("profile").filter(
-            pk=user_id,
-            user_active=True,
-            user_delete=False
-        ).first()
-    except Exception:
-        return JsonResponse({
-            "success": False,
-            "message": "Token inválido o expirado.",
-            "action": "closeSession"
-        }, status=401)
-
-    if not user:
+    if not menu:
         return JsonResponse({
             "success": False,
             "message": "Usuario no encontrado o inactivo.",
@@ -136,8 +129,8 @@ def me(request):
 
     return JsonResponse({
         "success": True,
-        "message": "Usuario obtenido con éxito.",
-        "data": _user_payload(user)
+        "message": "Response OK",
+        "data": menu
     }, status=200)
 
 

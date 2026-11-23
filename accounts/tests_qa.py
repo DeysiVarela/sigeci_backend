@@ -113,10 +113,10 @@ class UserQaTests(base.BaseCase):
         self.assertEqual(ok.status_code, 200)
 
         author = Profile.objects.get(profile_name="AUTHOR").pk
-        denied = self.client.patch(f"/api/users/{self.member.pk}/", {"profile": author}, format="json")
+        denied = self.client.patch(f"/api/users/{self.member.pk}/", {"profiles": [author]}, format="json")  # <--- NUEVO
         self.assertEqual(denied.status_code, 403)
         self.member.refresh_from_db()
-        self.assertEqual(self.member.profile.profile_name, "MEMBER")
+        self.assertEqual(list(self.member.profiles.values_list("profile_name", flat=True)), ["MEMBER"])  # <--- NUEVO
 
     def test_responses_never_expose_secrets(self):
         self.auth("admin@t.co")

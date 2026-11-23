@@ -14,6 +14,7 @@ import os
 from datetime import timedelta
 from pathlib import Path
 from dotenv import load_dotenv
+from corsheaders.defaults import default_headers
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -37,10 +38,18 @@ ALLOWED_HOSTS = [
     ).split(",")
     if host.strip()
 ]
+
 # Si está en Render o no se definió, asegurar comodín y sufijo de Render
 if "*" not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.extend([".onrender.com", "localhost", "127.0.0.1"])
 
+
+# Carga de ficheros:
+SUPABASE_S3_ENDPOINT = os.getenv("SUPABASE_S3_ENDPOINT")
+SUPABASE_S3_REGION = os.getenv("SUPABASE_S3_REGION")
+SUPABASE_S3_ACCESS_KEY = os.getenv("SUPABASE_S3_ACCESS_KEY")
+SUPABASE_S3_SECRET_KEY = os.getenv("SUPABASE_S3_SECRET_KEY")
+SUPABASE_BUCKET = os.getenv("SUPABASE_BUCKET")
 
 # ---------------------------------------------------------------------------
 # Correo (SCRUM-13: SendGrid SMTP). Una sola definición de EMAIL_BACKEND:
@@ -76,12 +85,11 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'corsheaders',
+    'uploads',
     'accounts',
     'auth_api',
-    'notifications',
-    'Login',
     'article',
-    'dashboard',
+    'notifications',
 ]
 
 MIDDLEWARE = [
@@ -89,7 +97,7 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
+    # 'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -200,8 +208,12 @@ SIMPLE_JWT = {
 }
 
 # CORS: origen del frontend (Vite)
-CORS_ALLOWED_ORIGINS = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:5173').split(',')
+CORS_ALLOWED_ORIGINS = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:5173,https://sigeci-frontend-bn1sro5wn-desarrollo-828f.vercel.app').split(',')
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = [
+    *default_headers,
+    "profile"
+]
 
 # reCAPTCHA: la clave (RECAPTCHA_SECRET_KEY) la lee auth_api del entorno. El CAPTCHA es
 # obligatorio siempre, salvo que en DESARROLLO se ponga CAPTCHA_REQUIRED=False.

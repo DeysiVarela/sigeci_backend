@@ -1,13 +1,20 @@
 import json
 from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from util.auth_service import require_permission
-
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
+from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-from .models import Article, ArticleReviewer
+from util.auth_service import require_permission, require_permission_drf
+from util.uploads.uploads import delete_file
+from util.utilDB import queryDB
+
+from .models import Article, ArticleAttached, ArticleReviewer, Topic
+from .serializers import ArticleReorderSerializer
 
 
 def _parse_body(request):
@@ -19,18 +26,57 @@ def _parse_body(request):
         return {}
 
 
-@require_permission(endpoint="article", action="view")
-def list_articles(request):
-    """Listar artículos activos."""
-    articles = Article.objects.select_related("topic_id", "article_created_by").filter(article_active=True)
+def list_topics(request):
+    """Listar temas activos."""
+    topics = Topic.objects.filter(topic_active=True, topic_delete=False)
     return JsonResponse({
         "success": True,
-        "message": "Artículos obtenidos con éxito.",
-        "data": [a.to_dict() for a in articles]
+        "message": "Temas obtenidos con éxito.",
+        "data": [t.to_dict() for t in topics]
     }, safe=False, status=200)
 
 
-@csrf_exempt
+@require_permission(endpoint="article", action="view")
+def list_articles(request):
+    profile = str(request.user.get("profile_id"))
+    user = request.user.get("user_id")
+    articles = []
+    match profile:
+        case "1":
+            articles = queryDB("""
+                select 
+                    ar.*,
+                    tp.topic_subject
+                from article ar
+                inner join topic tp
+                    on tp.topic_id = ar.topic_id
+            """, None)
+
+        case "2":
+            articles = (
+                Article.objects
+                .select_related("topic_id", "article_created_by")
+                .prefetch_related("attachments")
+                .filter(article_active=True)
+            )
+        case "3":
+            articles = queryDB("""
+                select 
+                    ar.*,
+                    tp.topic_subject
+                from article ar
+                inner join topic tp
+                    on tp.topic_id = ar.topic_id
+                where ar.article_created_by = %s
+            """, [user])
+
+    return JsonResponse({
+        "success": True,
+        "message": "Artículos obtenidos con éxito.",
+        "data": articles
+    }, safe=False, status=200)
+
+
 @require_permission(endpoint="article", action="view")
 def detail_article(request, article_id):
     """Consultar detalle, actualizar o eliminar según el método HTTP."""
@@ -42,7 +88,12 @@ def detail_article(request, article_id):
         return JsonResponse({"detail": "Método no permitido.", "success": False}, status=405)
 
     try:
-        article = Article.objects.get(pk=article_id)
+        article = (
+            Article.objects
+            .select_related("topic_id", "article_created_by")
+            .prefetch_related("attachments")
+            .get(pk=article_id)
+        )
         return JsonResponse({
             "success": True,
             "message": "Artículo obtenido con éxito.",
@@ -52,7 +103,6 @@ def detail_article(request, article_id):
         return JsonResponse({"detail": "Artículo no encontrado.", "success": False}, status=404)
 
 
-@csrf_exempt
 @require_permission(endpoint="article", action="create")
 def create_article(request):
     """Crear un nuevo artículo."""
@@ -72,15 +122,30 @@ def create_article(request):
             status=400,
         )
 
+    created_by_id = request.user.get("user_id")
+
     article = Article.objects.create(
         article_subject=subject,
         article_description=data.get("article_description", data.get("summary", "")),
-        topic_id=data.get("topic_id"),
+        topic_id_id=data.get("topic_id"),
         article=content,
         article_date=data.get("article_date") or data.get("published_at"),
-        article_created_by_id=data.get("article_created_by"),
+        article_created_by_id=created_by_id,
     )
-    return JsonResponse(article.to_dict(), status=201)
+
+    attached_url = data.get("article_attached_url")
+    if attached_url:
+        ArticleAttached.objects.create(
+            article=article,
+            article_attached_url=attached_url,
+            article_attached_created_by_id=created_by_id,
+        )
+
+    return JsonResponse({
+        "success": True,
+        "message": "Artículo creado con éxito.",
+        "data": article.to_dict(),
+    }, status=201)
 
 
 @csrf_exempt
@@ -115,16 +180,48 @@ def update_article(request, article_id):
         article.article = data["content"]
 
     if "topic_id" in data:
-        article.topic_id = data["topic_id"]
+        article.topic_id_id = data["topic_id"]
 
     if "article_date" in data:
         article.article_date = data["article_date"]
 
-    if "article_updated_by" in data:
-        article.article_updated_by_id = data["article_updated_by"]
+    updated_by_id = data.get("article_updated_by") or (
+        request.user.get("user_id") if isinstance(request.user, dict) else None
+    )
+    if updated_by_id:
+        article.article_updated_by_id = updated_by_id
+    article.article_updated_at = timezone.now()
+
+    attached_url = data.get("article_attached_url") or data.get("pdf_url") or data.get("file_url")
+    if attached_url:
+        existing_attachments = article.attachments.filter(
+            article_attached_active=True,
+            article_attached_delete=False,
+        )
+        for att in existing_attachments:
+            if att.article_attached_url and att.article_attached_url != attached_url:
+                delete_file(att.article_attached_url)
+
+        latest_att = existing_attachments.first()
+        if latest_att:
+            latest_att.article_attached_url = attached_url
+            if updated_by_id:
+                latest_att.article_attached_updated_by_id = updated_by_id
+            latest_att.article_attached_updated_at = timezone.now()
+            latest_att.save()
+        else:
+            ArticleAttached.objects.create(
+                article=article,
+                article_attached_url=attached_url,
+                article_attached_created_by_id=updated_by_id,
+            )
 
     article.save()
-    return JsonResponse(article.to_dict(), status=200)
+    return JsonResponse({
+        "success": True,
+        "message": "Artículo actualizado con éxito.",
+        "data": article.to_dict(),
+    }, status=200)
 
 
 @csrf_exempt
@@ -143,7 +240,10 @@ def delete_article(request, article_id):
 
 
 def _member_only(request):
-    return getattr(request.user, "profile", None) and request.user.profile.profile_name == "MEMBER"
+    return bool(
+        getattr(request.user, "profiles", None)
+        and request.user.profiles.filter(profile_name="MEMBER", profile_active=True, profile_delete=False).exists()
+    )
 
 
 def _evaluation_payload(review):
@@ -276,3 +376,48 @@ def submit_evaluation_verdict(request, review_id):
     ])
     return Response(_evaluation_payload(review), status=200)
 
+# ==============================================================================
+# VISTAS DE LA SCRUM-176 (ARTÍCULOS POR TÓPICO Y REORDENAMIENTO)
+# ==============================================================================
+class ArticleReorderView(APIView):
+    """
+    POST /api/v1/article/reorder/
+    Recibe una lista de IDs en el nuevo orden y actualiza la base de datos.
+    """
+    authentication_classes = []
+    permission_classes = []
+
+    @require_permission_drf(endpoint="article", action="update")
+    def post(self, request):
+        serializer = ArticleReorderSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        ordered_ids = serializer.validated_data['ordered_ids']
+
+        for index, article_id in enumerate(ordered_ids):
+            Article.objects.filter(article_id=article_id).update(article_order=index)
+
+        return Response({"detail": "Orden actualizado correctamente."}, status=status.HTTP_200_OK)
+
+
+class ArticleByTopicListView(APIView):
+    """
+    GET /api/v1/article/topics/{topic_id}/articles/
+    Lista los artículos de un tópico específico.
+    """
+    authentication_classes = []
+    permission_classes = []
+
+    @require_permission_drf(endpoint="article", action="view")
+    def get(self, request, topic_id):
+        topic = get_object_or_404(Topic, topic_id=topic_id, topic_active=True, topic_delete=False)
+        articles = Article.objects.filter(
+            topic_id=topic,
+            article_active=True,
+            article_delete=False
+        ).order_by('article_order')
+
+        return Response({
+            "success": True,
+            "message": f"Artículos del tópico {topic.topic_subject} obtenidos.",
+            "data": [a.to_dict() for a in articles]
+        }, status=200)

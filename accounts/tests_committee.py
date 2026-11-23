@@ -13,7 +13,7 @@ class CommitteeMemberTests(base.BaseCase):
         return Profile.objects.get(profile_name=name).pk
 
     def new_user(self, email, profile):
-        return {"name": "Ana", "lastname": "Paz", "email": email, "password": base.PWD, "profile": self.pid(profile)}
+        return {"name": "Ana", "lastname": "Paz", "email": email, "password": base.PWD, "profiles": [self.pid(profile)]}  # <--- NUEVO
 
     def test_can_list_users(self):
         self.assertEqual(self.client.get("/api/users/").status_code, 200)
@@ -22,7 +22,7 @@ class CommitteeMemberTests(base.BaseCase):
         for i, role in enumerate(("AUTHOR", "MEMBER")):
             r = self.client.post("/api/users/", self.new_user(f"nuevo{i}@t.co", role), format="json")
             self.assertEqual(r.status_code, 201, role)
-            self.assertEqual(r.data["profile_name"], role)
+            self.assertEqual(r.data["profiles"][0]["name"], role)  # <--- NUEVO
 
     def test_cannot_create_admin_users(self):
         r = self.client.post("/api/users/", self.new_user("admin2@t.co", "ADMIN"), format="json")
@@ -30,15 +30,15 @@ class CommitteeMemberTests(base.BaseCase):
         self.assertFalse(User.objects.filter(user_email="admin2@t.co").exists())
 
     def test_cannot_assign_admin_role_to_existing_user(self):
-        r = self.client.patch(f"/api/users/{self.author.pk}/", {"profile": self.pid("ADMIN")}, format="json")
+        r = self.client.patch(f"/api/users/{self.author.pk}/", {"profiles": [self.pid("ADMIN")]}, format="json")  # <--- NUEVO
         self.assertEqual(r.status_code, 403)
         self.author.refresh_from_db()
-        self.assertEqual(self.author.profile.profile_name, "AUTHOR")
+        self.assertEqual(list(self.author.profiles.values_list("profile_name", flat=True)), ["AUTHOR"])  # <--- NUEVO
 
     def test_can_edit_change_role_deactivate_and_delete_non_admin_users(self):
         url = f"/api/users/{self.author.pk}/"
         self.assertEqual(self.client.patch(url, {"name": "Nuevo"}, format="json").status_code, 200)
-        self.assertEqual(self.client.patch(url, {"profile": self.pid("MEMBER")}, format="json").status_code, 200)
+        self.assertEqual(self.client.patch(url, {"profiles": [self.pid("MEMBER")]}, format="json").status_code, 200)  # <--- NUEVO
         self.assertEqual(self.client.patch(url, {"active": False}, format="json").status_code, 200)
         self.assertEqual(self.client.delete(url).status_code, 204)
 

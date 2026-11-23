@@ -28,12 +28,12 @@ class RegisterTests(base.BaseCase):
         r = self.register()
         self.assertEqual(r.status_code, 201)
         user = User.objects.get(user_email="ana@t.co")
-        self.assertEqual(user.profile.profile_name, "AUTHOR")
+        self.assertEqual(list(user.profiles.values_list("profile_name", flat=True)), ["AUTHOR"])  # <--- NUEVO
         self.assertTrue(user.user_active)
         self.assertFalse(user.user_delete)
         self.assertEqual(user.user_provider, "ACCOUNT")
         self.assertIsNone(user.user_created_by)
-        self.assertEqual(r.data["user"]["profile_name"], "AUTHOR")
+        self.assertEqual(r.data["user"]["profiles"][0]["name"], "AUTHOR")  # <--- NUEVO
 
     def test_is_public_even_with_a_bad_authorization_header(self):
         self.client.credentials(HTTP_AUTHORIZATION="Bearer basura")
@@ -48,6 +48,7 @@ class RegisterTests(base.BaseCase):
         for field, value in (
             ("profile", admin_id), ("profile_id", admin_id), ("profile_name", "ADMIN"),
             ("role", "ADMIN"), ("rol", "ADMIN"), ("perfil", "ADMIN"), ("user_role", "ADMIN"),
+            ("profiles", [admin_id]),  # <--- NUEVO
         ):
             with self.subTest(field=field):
                 r = self.register(**{field: value})
@@ -58,7 +59,9 @@ class RegisterTests(base.BaseCase):
     def test_empty_role_fields_are_ignored_and_the_role_is_still_author(self):
         r = self.register(profile="", role=None)
         self.assertEqual(r.status_code, 201)
-        self.assertEqual(User.objects.get(user_email="ana@t.co").profile.profile_name, "AUTHOR")
+        self.assertEqual(  # <--- NUEVO
+            list(User.objects.get(user_email="ana@t.co").profiles.values_list("profile_name", flat=True)), ["AUTHOR"]
+        )  # <--- NUEVO
 
     def test_new_author_has_no_user_management_permissions(self):
         self.register()
@@ -83,7 +86,7 @@ class RegisterTests(base.BaseCase):
         r = self.register(email="ADMIN@T.CO")
         self.assertEqual(r.status_code, 409)
         self.admin.refresh_from_db()
-        self.assertEqual(self.admin.profile.profile_name, "ADMIN")
+        self.assertEqual(list(self.admin.profiles.values_list("profile_name", flat=True)), ["ADMIN"])  # <--- NUEVO
         self.assertTrue(self.admin.check_password(base.PWD))  # la contraseña existente no cambió
 
     def test_concurrent_duplicate_is_also_409(self):

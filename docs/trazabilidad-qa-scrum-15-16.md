@@ -39,6 +39,20 @@ Archivo de pruebas: `accounts/tests_register.py`. Los CA-01 a CA-03 y CA-08 son 
 | 07 | Contraseña con hash seguro, nunca en claro | `test_password_is_hashed_with_django_pbkdf2_and_never_returned` | Auto – **desviación acordada por el equipo:** el criterio nombra bcrypt/argon2 y se usa el hash de Django (PBKDF2-SHA256); pendiente de confirmar con el PO/QA |
 | 08 | Mensaje de cuenta creada y redirección al login | El backend devuelve el mensaje; la redirección es del frontend | Pendiente (frontend) |
 
+## SCRUM-125 – Endpoints /me (consultar, actualizar perfil y cambiar contraseña)
+Archivo de pruebas: `accounts/tests_me.py`. Criterio de la tarea: `GET/PATCH /api/users/me` y `PUT /api/users/me/password/`, solo sobre el usuario de la sesión.
+| Requisito | Pruebas | Estado |
+|---|---|---|
+| `GET /api/users/me` devuelve al usuario de la sesión, sin secretos | `test_get_returns_the_session_user_even_without_user_permissions` | Auto |
+| Requiere autenticación; solo operan sobre el usuario de la sesión | `test_requires_authentication`, `test_patch_only_touches_the_session_user` | Auto |
+| `PATCH /api/users/me` actualiza nombre, apellido y correo (validado, correo único) | `test_patch_updates_name_lastname_and_email`, `test_patch_is_partial_and_accepts_the_trailing_slash`, `test_patch_with_a_taken_email_is_rejected_and_nothing_changes`, `test_patch_validation_errors_persist_nothing` | Auto |
+| No se puede cambiar el rol, el estado, el proveedor ni la contraseña desde el perfil | `test_patch_cannot_change_role_status_provider_or_password` | Auto |
+| `PUT /api/users/me/password/` pide la contraseña actual y aplica las reglas de contraseña | `test_changes_the_password`, `test_wrong_current_password_is_400_and_never_401`, `test_weak_new_password_is_rejected`, `test_new_password_must_differ_from_the_current_one`, `test_missing_fields_are_required` | Auto |
+| Hash seguro y sin exponer contraseñas | `test_new_password_is_stored_with_django_pbkdf2` | Auto |
+| Protección contra fuerza bruta y PIN pendientes | `MyPasswordThrottleTests`, `test_pending_recovery_pins_stop_working` | Auto |
+| Las rutas `/me` no rompen el CRUD de usuarios | `test_me_does_not_break_the_users_crud_routes` | Auto |
+| La respuesta de `/me` sirve para refrescar la sesión (incluye permisos) | `test_get_has_the_same_shape_as_auth_me_including_permissions` | Auto |
+
 ## Evidencia a adjuntar (siguiendo la numeración E0x que ya usa `docs/`)
 1. Salida de pruebas: `python manage.py test accounts notifications auth_api -v 2` (sin `.env` ni claves).
 2. Salida de `RUN_LIVE_CAPTCHA_TESTS=1 python manage.py test accounts.tests_captcha_live` con las claves reales.
