@@ -239,10 +239,11 @@ def delete_article(request, article_id):
         return JsonResponse({"detail": "Artículo no encontrado."}, status=404)
 
 
-def _member_only(request):
+def _can_evaluate(request, permission):
+    user = getattr(request, "user", None)
     return bool(
-        getattr(request.user, "profiles", None)
-        and request.user.profiles.filter(profile_name="MEMBER", profile_active=True, profile_delete=False).exists()
+        getattr(user, "is_authenticated", False)
+        and user.has_perm_on("evaluation", permission)
     )
 
 
@@ -286,8 +287,8 @@ def _evaluation_payload(review):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def assigned_evaluations(request):
-    if not _member_only(request):
-        return Response({"detail": "Solo los miembros del Comité Científico pueden consultar evaluaciones."}, status=403)
+    if not _can_evaluate(request, "view"):
+        return Response({"detail": "No tienes permiso para consultar evaluaciones."}, status=403)
 
     reviews = (
         ArticleReviewer.objects.select_related(
@@ -308,8 +309,8 @@ def assigned_evaluations(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def assigned_evaluation_detail(request, review_id):
-    if not _member_only(request):
-        return Response({"detail": "Solo los miembros del Comité Científico pueden consultar evaluaciones."}, status=403)
+    if not _can_evaluate(request, "view"):
+        return Response({"detail": "No tienes permiso para consultar evaluaciones."}, status=403)
 
     review = (
         ArticleReviewer.objects.select_related(
@@ -342,8 +343,8 @@ def assigned_evaluation_detail(request, review_id):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def submit_evaluation_verdict(request, review_id):
-    if not _member_only(request):
-        return Response({"detail": "Solo los miembros del Comité Científico pueden emitir veredictos."}, status=403)
+    if not _can_evaluate(request, "update"):
+        return Response({"detail": "No tienes permiso para emitir veredictos."}, status=403)
 
     review = ArticleReviewer.objects.select_related("article").filter(
         article_reviewer_id=review_id,

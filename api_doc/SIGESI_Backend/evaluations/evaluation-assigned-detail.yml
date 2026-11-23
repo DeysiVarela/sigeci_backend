@@ -19,7 +19,7 @@ settings:
   forwardAuthorizationHeader: false
 
 docs: |-
-  Requiere el perfil MEMBER y que la evaluación pertenezca al usuario autenticado.
+  Requiere el permiso "evaluation:view" y que la evaluación pertenezca al usuario autenticado.
   Si el estado inicial es PENDIENTE, se cambia a EN_REVISION al consultar.
 
   Respuesta 200: objeto de evaluación.

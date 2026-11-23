@@ -28,7 +28,7 @@ settings:
   forwardAuthorizationHeader: false
 
 docs: |-
-  Requiere el perfil MEMBER y que la evaluación pertenezca al usuario autenticado.
+  Requiere el permiso "evaluation:update" y que la evaluación pertenezca al usuario autenticado.
 
   Cuerpo:
   {

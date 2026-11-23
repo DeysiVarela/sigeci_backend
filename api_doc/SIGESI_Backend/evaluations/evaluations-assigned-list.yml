@@ -19,8 +19,8 @@ settings:
   forwardAuthorizationHeader: false
 
 docs: |-
-  Requiere el perfil MEMBER. Devuelve únicamente las evaluaciones asignadas
-  al jurado autenticado.
+  Requiere el permiso "evaluation:view" en la matriz ProfileAction.
+  Devuelve únicamente las evaluaciones asignadas al jurado autenticado.
 
   Respuesta 200:
   [

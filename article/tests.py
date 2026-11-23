@@ -167,6 +167,20 @@ class EvaluationAssignmentTests(APITestCase):
         )
         self.assertEqual(response.status_code, 404)
 
+    def test_author_cannot_view_or_verdict(self):
+        author = self.make_user("autor@sigeci.test", "AUTHOR")
+        self.authenticate(author)
+
+        list_response = self.client.get("/api/evaluations/assigned/")
+        self.assertEqual(list_response.status_code, 403)
+
+        verdict_response = self.client.post(
+            f"/api/evaluations/assigned/{self.review.article_reviewer_id}/verdict/",
+            {"verdict": "APROBADO", "comments": "Comentario válido."},
+            format="json",
+        )
+        self.assertEqual(verdict_response.status_code, 403)
+
     def test_verdict_requires_comments_and_persists(self):
         self.authenticate(self.member)
         url = f"/api/evaluations/assigned/{self.review.article_reviewer_id}/verdict/"
