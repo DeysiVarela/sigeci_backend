@@ -1,6 +1,6 @@
 from django.db import models
+import uuid
 from util.uploads.uploads import generate_download_url
-
 
 class Topic(models.Model):
     topic_id = models.AutoField(primary_key=True)
@@ -62,6 +62,12 @@ class Article(models.Model):
     article = models.TextField()
     article_date = models.DateField(null=True, blank=True)
     article_copyright_url = models.URLField(blank=True, null=True)
+    
+    
+    verification_code = models.UUIDField(default=uuid.uuid4, editable=False, null=True, blank=True)
+    is_eligible_for_proceedings = models.BooleanField(default=False)
+    
+
     article_active = models.BooleanField(default=True)
     article_delete = models.BooleanField(default=False)
 
