@@ -18,3 +18,16 @@ variables:
   - name: reviewId
     value: "1"
     description: "ID de la asignación ArticleReviewer."
+  - name: apiUrl
+    value: http://localhost:8000/api
+    description: "Base de la app accounts (usuarios, /me, /me/delete). Sin /v1."
+  - name: apiUrl
+    value: https://sigeci-backend.onrender.com/api
+    disabled: true
+    description: "Base remota de la app accounts."
+  - name: passwordActual
+    value: ""
+    description: "Contraseña del usuario dueño de {{token}} (solo para probar SCRUM-129). No la subas al repo."
+  - name: tokenSinPermiso
+    value: ""
+    description: "Access token de un usuario cuyo rol NO tiene me:delete (prueba del 403)."

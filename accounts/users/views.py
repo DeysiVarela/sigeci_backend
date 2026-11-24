@@ -1,3 +1,5 @@
+import uuid
+
 from django.conf import settings
 from django.db import IntegrityError, transaction
 from django.utils import timezone
@@ -11,10 +13,10 @@ from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
 
 from ..models import Profile, User
-from ..permissions import HasProfilePermission
+from ..permissions import HasProfilePermission, profile_permission
 from .serializers import (
-    ChangePasswordSerializer, MyProfileUpdateSerializer, ProfileSerializer, UserCreateSerializer,
-    UserSerializer, UserUpdateSerializer, is_admin, is_last_admin,
+    ChangePasswordSerializer, DeleteAccountSerializer, MyProfileUpdateSerializer, ProfileSerializer,
+    UserCreateSerializer, UserSerializer, UserUpdateSerializer, is_admin, is_last_admin,
 )
 
 # --------------------------------------------------------------------------- #
@@ -101,10 +103,8 @@ class UserViewSet(viewsets.ModelViewSet):
             raise ValidationError({"detail": "No se puede eliminar al único administrador activo."})
         # Borrado lógico: el usuario pierde el acceso y desaparece de la API, pero su registro se
         # conserva (integridad referencial con otras tablas, p. ej. article_reviewer).
-    # Generar el sufijo con fecha y hora actual (Ej: _delete_20261112_103900)
+        # Generar el sufijo con fecha y hora actual (Ej: _delete_20261112_103900)
         timestamp = timezone.now().strftime("%Y%m%d_%H%M%S")
-
-    # Nota: se agrega fecha al correo 
         if user.user_email:
             user.user_email = f"{user.user_email}_delete_{timestamp}"
 
@@ -196,3 +196,64 @@ class MyPasswordView(APIView):
             # Un PIN de recuperación pedido antes del cambio ya no debe servir
             user.reset_pins.filter(used_at__isnull=True).update(used_at=timezone.now())
         return Response({"detail": "Contraseña actualizada."})
+
+
+# --------------------------------------------------------------------------- #
+# SCRUM-129: auto-eliminación de cuenta
+# --------------------------------------------------------------------------- #
+class AccountDeleteRateThrottle(UserRateThrottle):
+    """Límite de intentos al eliminar la cuenta (pide contraseña). ACCOUNT_DELETE_RATE, por defecto 5/min."""
+
+    scope = "account_delete"
+
+    def get_rate(self):
+        return getattr(settings, "ACCOUNT_DELETE_RATE", "5/min")
+
+
+class MyAccountDeleteView(APIView):
+    """
+    POST /api/users/me/delete/   body: { "password": "..." }
+    Desactiva MI propia cuenta (borrado lógico, SCRUM-129).
+
+    Seguridad (backend): sesión válida + permiso de matriz `me:delete` + contraseña actual.
+    No recibe ningún id: solo opera sobre el usuario de la sesión.
+      200 -> cuenta desactivada; el access/refresh deja de servir en TODAS las rutas (DRF y /api/v1)
+      400 -> { "password": [...] } contraseña incorrecta/faltante, o { "detail": ... } si soy el único admin
+      401 -> sin sesión · 403 -> sin permiso me:delete en la matriz · 429 -> demasiados intentos
+    """
+
+    permission_classes = [IsAuthenticated, profile_permission("me", "delete")]
+    throttle_classes = [AccountDeleteRateThrottle]
+
+    def post(self, request):
+        user = request.user
+
+        # 1. Validar la contraseña (también rechaza cuentas sin contraseña propia, p. ej. GMAIL)
+        ser = DeleteAccountSerializer(data=request.data, context={"request": request})
+        ser.is_valid(raise_exception=True)
+
+        # 2. No se puede dejar el sistema sin administradores
+        if is_last_admin(user):
+            return Response(
+                {"detail": "No puedes eliminar tu cuenta porque eres el único administrador activo."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # 3. Borrado lógico: el registro se conserva (artículos, revisiones, auditoría)
+        with transaction.atomic():
+            user.user_delete = True
+            user.user_active = False
+            user.deactivation_reason = User.REASON_AUTO_ELIMINADO
+            user.user_updated_by = user
+            user.user_updated_at = timezone.now()
+            # Rota el seed token: los endpoints /api/v1 (decorador require_permission) solo validan el JWT
+            # contra este valor; sin rotarlo, el token seguiría sirviendo hasta que expire.
+            user.user_seed_token = str(uuid.uuid4())
+            user.save(update_fields=[
+                "user_delete", "user_active", "deactivation_reason",
+                "user_updated_by", "user_updated_at", "user_seed_token",
+            ])
+            # Un PIN de recuperación pedido antes de eliminar ya no debe servir
+            user.reset_pins.filter(used_at__isnull=True).update(used_at=timezone.now())
+
+        return Response({"detail": "Tu cuenta ha sido desactivada."}, status=status.HTTP_200_OK)

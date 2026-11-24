@@ -1,0 +1,29 @@
+info:
+  name: SCRUM-129 · Sin token (401)
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{apiUrl}}/users/me/delete/"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "password": "cualquiera"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+docs: |-
+  Prueba de seguridad: la URL por sí sola no sirve.
+  Esperado: 401 (no se llega a validar permisos ni contraseña).

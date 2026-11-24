@@ -67,6 +67,14 @@ class User(models.Model):
     PROVIDER_GMAIL = "GMAIL"
     PROVIDERS = [(PROVIDER_ACCOUNT, "ACCOUNT"), (PROVIDER_GMAIL, "GMAIL")]
 
+    # Motivo de la baja de la cuenta (SCRUM-129)
+    REASON_AUTO_ELIMINADO = "AUTO_ELIMINADO"
+    REASON_SUSPENDIDO = "SUSPENDIDO_POR_ADMIN"
+    REASON_CHOICES = [
+        (REASON_AUTO_ELIMINADO, "Auto-eliminado"),
+        (REASON_SUSPENDIDO, "Suspendido por administrador"),
+    ]
+
     user_id = models.AutoField(primary_key=True)
     user_name = models.CharField(max_length=60)
     user_lastname = models.CharField(max_length=60)
@@ -78,6 +86,10 @@ class User(models.Model):
     profiles = models.ManyToManyField(Profile, related_name="users", db_table="user_profiles")
     user_active = models.BooleanField(default=True)
     user_delete = models.BooleanField(default=False)
+    # Por qué se dio de baja (SCRUM-129). Null mientras la cuenta esté en uso.
+    deactivation_reason = models.CharField(
+        max_length=60, choices=REASON_CHOICES, null=True, blank=True
+    )
 
     # Campos de auditoría (recuadro "Definition" del ERD)
     user_created_by = models.ForeignKey(
