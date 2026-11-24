@@ -103,11 +103,6 @@ class UserViewSet(viewsets.ModelViewSet):
             raise ValidationError({"detail": "No se puede eliminar al único administrador activo."})
         # Borrado lógico: el usuario pierde el acceso y desaparece de la API, pero su registro se
         # conserva (integridad referencial con otras tablas, p. ej. article_reviewer).
-        # Generar el sufijo con fecha y hora actual (Ej: _delete_20261112_103900)
-        timestamp = timezone.now().strftime("%Y%m%d_%H%M%S")
-        if user.user_email:
-            user.user_email = f"{user.user_email}_delete_{timestamp}"
-
         user.user_delete = True
         user.user_active = False
         user.user_updated_by = request.user
