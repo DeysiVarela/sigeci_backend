@@ -16,4 +16,6 @@ urlpatterns = [
     path('api/v1/', include('article.urls')),
     path('api/', include('article.urls')),
     path('api/v1/', include('uploads.urls')),
+    # SCRUM-30/31: versiones del artículo y avales (el frontend llama a /api/articles/{id}/...)
+    path('api/articles/', include('article.urls_versions')),
 ]

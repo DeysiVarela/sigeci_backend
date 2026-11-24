@@ -14,6 +14,7 @@ MATRIX = {
         "article": ["view", "create", "update", "delete", "active", "inactive", "download"],
         "event": ["view", "create", "update", "delete", "active", "inactive"],
         "application": ["view", "create", "update", "delete", "active", "inactive", "download"],
+        "evaluation": ["view", "update"],  # el comité (ADMIN y MEMBER) emite los avales (SCRUM-30/31)
         "me": ["view", "delete"],  # "me": mi propia cuenta (view = /auth/me, delete = SCRUM-129)
     },
     # MEMBER = miembro del comité científico: gestiona usuarios, salvo cuentas y rol de

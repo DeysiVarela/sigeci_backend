@@ -31,3 +31,6 @@ variables:
   - name: tokenSinPermiso
     value: ""
     description: "Access token de un usuario cuyo rol NO tiene me:delete (prueba del 403)."
+  - name: articleId
+    value: "1"
+    description: "ID del artículo para las pruebas de versiones (SCRUM-30/31)."
