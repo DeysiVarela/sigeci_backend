@@ -237,3 +237,17 @@ class ChangePasswordSerializer(serializers.Serializer):
         if attrs["currentPassword"] == attrs["newPassword"]:
             raise serializers.ValidationError({"newPassword": "La nueva contraseña debe ser diferente a la actual."})
         return attrs
+
+# --------------------------------------------------------------------------- #
+# SCRUM-129: auto-eliminación de cuenta
+# --------------------------------------------------------------------------- #
+class DeleteAccountSerializer(serializers.Serializer):
+    password = serializers.CharField(write_only=True, trim_whitespace=False)
+
+    def validate_password(self, value):
+        user = self.context["request"].user
+        if user.user_provider != User.PROVIDER_ACCOUNT:
+            raise serializers.ValidationError("Tu cuenta no usa una contraseña propia; no se puede eliminar aquí.")
+        if not user.check_password(value):
+            raise serializers.ValidationError("La contraseña es incorrecta.")
+        return value

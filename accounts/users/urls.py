@@ -11,4 +11,5 @@ urlpatterns = [
     path("profiles/", views.ProfileListView.as_view()),
     re_path(r"^users/me/?$", views.MyProfileView.as_view()),  # /api/users/me y /api/users/me/
     re_path(r"^users/me/password/?$", views.MyPasswordView.as_view()),  # /api/users/me/password/
+    re_path(r"^users/me/delete/?$", views.MyAccountDeleteView.as_view()),  # /api/users/me/delete/ (SCRUM-129)
 ] + router.urls

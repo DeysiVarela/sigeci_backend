@@ -1,0 +1,29 @@
+info:
+  name: SCRUM-30 · Ver versión corregida (GET)
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{apiUrl}}/articles/{{articleId}}/corrected-version/"
+  headers:
+    - name: Authorization
+      value: "Bearer {{token}}"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+docs: |-
+  Base: {{apiUrl}} (= http://localhost:8000/api, SIN /v1) y {{articleId}} = id del artículo.
+  Cabecera: Authorization: Bearer <token> (con "Bearer"; esta ruta es DRF).
+  Seguridad: sesión (401) + permiso de matriz (403) + regla por objeto (403). La URL sola no sirve.
+  
+  Matriz: article:view. Objeto: autor del artículo, comité (ADMIN/MEMBER) o evaluador asignado.
+  200 {article_id, article_subject, article_description, article_copyright_url, corrected_version, versions}
+  401 sin token · 403 sin article:view o usuario ajeno al artículo · 404 inexistente/eliminado
+  Las URLs de archivos llegan FIRMADAS y vencen (1 h).

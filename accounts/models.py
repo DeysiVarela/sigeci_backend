@@ -26,10 +26,12 @@ class Profile(models.Model):
 
 class ProfileAction(models.Model):
     """
-    Matriz de permisos: una fila por (perfil, recurso, permiso).
+    Matriz de permisos: una fila por (perfil, recurso). Convención del equipo:
+    los permisos van concatenados con "|" en una sola fila.
 
     action      -> article | event | application | user | user_role
-    permissions -> view | create | update | delete | active | inactive | download
+    permissions -> "view|create|update|delete|active|inactive|download"
+                   (cualquier subconjunto, separado por "|")
     """
 
     profile_action_id = models.AutoField(primary_key=True)
@@ -65,6 +67,14 @@ class User(models.Model):
     PROVIDER_GMAIL = "GMAIL"
     PROVIDERS = [(PROVIDER_ACCOUNT, "ACCOUNT"), (PROVIDER_GMAIL, "GMAIL")]
 
+    # Motivo de la baja de la cuenta (SCRUM-129)
+    REASON_AUTO_ELIMINADO = "AUTO_ELIMINADO"
+    REASON_SUSPENDIDO = "SUSPENDIDO_POR_ADMIN"
+    REASON_CHOICES = [
+        (REASON_AUTO_ELIMINADO, "Auto-eliminado"),
+        (REASON_SUSPENDIDO, "Suspendido por administrador"),
+    ]
+
     user_id = models.AutoField(primary_key=True)
     user_name = models.CharField(max_length=60)
     user_lastname = models.CharField(max_length=60)
@@ -76,6 +86,10 @@ class User(models.Model):
     profiles = models.ManyToManyField(Profile, related_name="users", db_table="user_profiles")
     user_active = models.BooleanField(default=True)
     user_delete = models.BooleanField(default=False)
+    # Por qué se dio de baja (SCRUM-129). Null mientras la cuenta esté en uso.
+    deactivation_reason = models.CharField(
+        max_length=60, choices=REASON_CHOICES, null=True, blank=True
+    )
 
     # Campos de auditoría (recuadro "Definition" del ERD)
     user_created_by = models.ForeignKey(
@@ -115,15 +129,16 @@ class User(models.Model):
     # --- Permisos por perfil ---
     def has_perm_on(self, action, permission):
         # Busca en todos los roles del usuario
-        return ProfileAction.objects.filter(
+        rows = ProfileAction.objects.filter(
             profile__in=self.profiles.all(),
             profile__profile_active=True,
             profile__profile_delete=False,
             profile_action_active=True,
             profile_action_delete=False,
             profile_action_action=action,
-            profile_action_permissions=permission,
-        ).exists()
+        ).values_list("profile_action_permissions", flat=True)
+        # Convención del equipo: "view|create|update|..." en una sola fila.
+        return any(permission in perms.split("|") for perms in rows)
 
     def permissions_map(self):
         # Obtiene los permisos de todos los roles del usuario
@@ -136,8 +151,10 @@ class User(models.Model):
         ).values_list("profile_action_action", "profile_action_permissions").distinct()
         
         result = {}
-        for action, perm in rows:
-            result.setdefault(action, []).append(perm)
+        for action, perms in rows:
+            for perm in perms.split("|"):
+                if perm and perm not in result.setdefault(action, []):
+                    result[action].append(perm)
         return result
 
 

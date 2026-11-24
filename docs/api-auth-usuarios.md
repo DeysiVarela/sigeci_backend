@@ -113,13 +113,27 @@ Cuerpo: `{ "currentPassword", "newPassword" }`. La confirmación se valida en la
 
 Efectos: la contraseña se cifra con el hash de Django (PBKDF2-SHA256) y los PIN de recuperación pendientes dejan de servir. Los tokens ya emitidos siguen vigentes hasta su vencimiento (no hay lista de revocación).
 
-## 4. Matriz de permisos inicial (`seed_accounts`)
-Recursos de este alcance: `user` y `user_role`. Los de `article`, `event` y `application` son **supuestos provisionales** de otros módulos.
+### `POST /api/users/me/delete/` — eliminar mi propia cuenta (SCRUM-129) — permiso `me:delete`
+Opera solo sobre el usuario de la sesión (no recibe id). Cuerpo: `{ "password": "contraseña actual" }`.
+Hace **borrado lógico**: `user_delete=true`, `user_active=false`, `deactivation_reason="AUTO_ELIMINADO"`; el registro se conserva. Además **rota `user_seed_token`**: así el token deja de servir también en los endpoints `/api/v1` (decorador `require_permission`), que solo validan el JWT contra ese valor.
 
-| Perfil | user | user_role | article | event | application |
-|---|---|---|---|---|---|
-| ADMIN | view, create, update, delete, active, inactive | update | todos | view, create, update, delete, active, inactive | todos |
-| MEMBER (comité científico) | view, create, update, delete, active, inactive (no sobre administradores ni rol ADMIN) | update | view, download | view | view |
-| AUTHOR | — | — | view, create, update, download | view | view, create, update |
+| Código | Respuesta |
+|---|---|
+| 200 | `{"detail": "Tu cuenta ha sido desactivada."}` — el access/refresh deja de servir y no se puede iniciar sesión |
+| 400 | `{"password": ["La contraseña es incorrecta."]}` (o falta el campo) · `{"detail": "No puedes eliminar tu cuenta porque eres el único administrador activo."}` · cuenta sin contraseña propia |
+| 401 | sin token válido |
+| 403 | el rol no tiene `me:delete` en la matriz (se valida **antes** que la contraseña) |
+| 429 | demasiados intentos (`ACCOUNT_DELETE_RATE`, por defecto 5/min) |
+
+Limitación conocida: aún no existe flujo de reactivación y el correo sigue reservado (registrarse con él devuelve `409`).
+
+## 4. Matriz de permisos inicial (`seed_accounts`)
+Recursos de este alcance: `user`, `user_role` y `me` (mi propia cuenta: `view` y `delete`; los tres perfiles). Los de `article`, `event` y `application` son **supuestos provisionales** de otros módulos.
+
+| Perfil | user | user_role | article | event | application | me |
+|---|---|---|---|---|---|---|
+| ADMIN | view, create, update, delete, active, inactive | update | todos | view, create, update, delete, active, inactive | todos | view, delete |
+| MEMBER (comité científico) | view, create, update, delete, active, inactive (no sobre administradores ni rol ADMIN) | update | view, download | view | view | view, delete |
+| AUTHOR | — | — | view, create, update, download | view | view, create, update | view, delete |
 
 La autorización se valida en el servidor en cada endpoint (`HasProfilePermission`); los permisos que el frontend lee de `/auth/me/` son solo informativos.

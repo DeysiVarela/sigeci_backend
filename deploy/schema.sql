@@ -252,3 +252,17 @@ CREATE TRIGGER trg_update_application_status
 BEFORE UPDATE OR INSERT ON application
 FOR EACH ROW
 EXECUTE FUNCTION fn_update_application_status();
+
+-- =========================================================================================
+-- ACTUALIZACIONES DE ESQUEMA (Sincronización con Supabase - SCRUM-176) archivos por topicos
+-- =========================================================================================
+ALTER TABLE topic
+    ADD COLUMN IF NOT EXISTS topic_active BOOLEAN NOT NULL DEFAULT TRUE,
+    ADD COLUMN IF NOT EXISTS topic_delete BOOLEAN NOT NULL DEFAULT FALSE;
+
+ALTER TABLE article
+    ADD COLUMN IF NOT EXISTS article_copyright_url VARCHAR(500),
+    ADD COLUMN IF NOT EXISTS article_active BOOLEAN NOT NULL DEFAULT TRUE,
+    ADD COLUMN IF NOT EXISTS article_delete BOOLEAN NOT NULL DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS verification_code UUID,
+    ADD COLUMN IF NOT EXISTS article_order INT NOT NULL DEFAULT 0;

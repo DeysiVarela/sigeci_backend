@@ -1,0 +1,128 @@
+info:
+  name: Registrar veredicto de evaluación
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{evaluationUrl}}/evaluations/assigned/{{reviewId}}/verdict/"
+  headers:
+    - name: Authorization
+      value: "Bearer {{token}}"
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "verdict": "APROBADO",
+        "comments": "Metodología sólida y resultados reproducibles."
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+docs: |-
+  Requiere el permiso "evaluation:update" y que la evaluación pertenezca al usuario autenticado.
+
+  Cuerpo:
+  {
+    "verdict": "APROBADO",
+    "comments": "Comentarios cualitativos obligatorios."
+  }
+
+  verdict admite APROBADO/APPROVED o RECHAZADO/REJECTED. La API persiste
+  APROBADO como APPROVED y RECHAZADO como REJECTED.
+
+  Respuestas:
+  200 veredicto registrado.
+  400 veredicto inválido o comentarios vacíos.
+  404 evaluación ajena o inexistente.
+  409 la evaluación ya tiene veredicto definitivo.
+
+examples:
+  - name: aprobar
+    request:
+      url: "{{evaluationUrl}}/evaluations/assigned/1/verdict/"
+      method: POST
+      headers:
+        - name: Authorization
+          value: "Bearer {{token}}"
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "verdict": "APROBADO",
+            "comments": "Metodología sólida y resultados reproducibles."
+          }
+    response:
+      status: 200
+      statusText: OK
+      body:
+        type: json
+        data: |-
+          {
+            "id": 1,
+            "articleId": 20,
+            "title": "Artículo asignado",
+            "status": "APROBADO",
+            "comments": "Metodología sólida y resultados reproducibles.",
+            "verdict": "APROBADO"
+          }
+  - name: comentarios obligatorios
+    request:
+      url: "{{evaluationUrl}}/evaluations/assigned/1/verdict/"
+      method: POST
+      headers:
+        - name: Authorization
+          value: "Bearer {{token}}"
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "verdict": "APROBADO",
+            "comments": ""
+          }
+    response:
+      status: 400
+      statusText: Bad Request
+      body:
+        type: json
+        data: |-
+          {
+            "detail": "Los comentarios cualitativos son obligatorios."
+          }
+  - name: veredicto ya registrado
+    request:
+      url: "{{evaluationUrl}}/evaluations/assigned/1/verdict/"
+      method: POST
+      headers:
+        - name: Authorization
+          value: "Bearer {{token}}"
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "verdict": "RECHAZADO",
+            "comments": "Observaciones finales."
+          }
+    response:
+      status: 409
+      statusText: Conflict
+      body:
+        type: json
+        data: |-
+          {
+            "detail": "El veredicto ya fue registrado y no puede modificarse."
+          }

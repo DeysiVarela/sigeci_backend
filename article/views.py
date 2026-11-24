@@ -1,13 +1,26 @@
 import json
 from django.http import JsonResponse
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from django.db import connection
-from util.utilDB import queryDB
 from django.views.decorators.csrf import csrf_exempt
-from util.auth_service import require_permission
-from util.uploads.uploads import delete_file
+from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
-from .models import Article, ArticleAttached, Topic
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from accounts.models import Profile
+from util.auth_service import require_permission, require_permission_drf
+from util.uploads.uploads import delete_file
+from util.utilDB import queryDB
+
+from .models import Article, ArticleAttached, ArticleReviewer, Event, Topic
+from .serializers import (
+    ArticleReorderSerializer,
+    EventDetailSerializer,
+    EventSerializer,
+    EventWriteSerializer,
+)
 
 
 def _parse_body(request):
@@ -29,14 +42,92 @@ def list_topics(request):
     }, safe=False, status=200)
 
 
+@api_view(["GET", "POST"])
+@permission_classes([IsAuthenticated])
+def list_events(request):
+    if request.method == "POST":
+        if not request.user.has_perm_on("event", "create"):
+            return Response(
+                {"success": False, "message": "No tienes permiso para crear eventos."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        serializer = EventWriteSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(
+                {"success": False, "message": "Los datos del evento no son válidos.", "errors": serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        event = serializer.save(event_created_by=request.user)
+        event = Event.objects.prefetch_related("schedule_items__topic_id").get(pk=event.pk)
+        return Response({
+            "success": True,
+            "message": "Evento creado con éxito.",
+            "data": EventDetailSerializer(event).data,
+        }, status=status.HTTP_201_CREATED)
+
+    events = Event.objects.order_by("event_date", "event_id")
+    return Response({
+        "success": True,
+        "message": "Eventos obtenidos con éxito.",
+        "data": EventSerializer(events, many=True).data,
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(["GET", "PUT", "PATCH"])
+@permission_classes([IsAuthenticated])
+def event_detail(request, event_id):
+    event = get_object_or_404(Event, event_id=event_id)
+    if request.method in ("PUT", "PATCH"):
+        if not request.user.has_perm_on("event", "update"):
+            return Response(
+                {"success": False, "message": "No tienes permiso para actualizar eventos."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        serializer = EventWriteSerializer(
+            event,
+            data=request.data,
+            partial=request.method == "PATCH",
+        )
+        if not serializer.is_valid():
+            return Response(
+                {"success": False, "message": "Los datos del evento no son válidos.", "errors": serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        event = serializer.save(
+            event_updated_by=request.user,
+            event_updated_at=timezone.now(),
+        )
+        event = Event.objects.prefetch_related("schedule_items__topic_id").get(pk=event.pk)
+        return Response({
+            "success": True,
+            "message": "Evento actualizado con éxito.",
+            "data": EventDetailSerializer(event).data,
+        }, status=status.HTTP_200_OK)
+
+    event = get_object_or_404(
+        Event.objects.prefetch_related("schedule_items__topic_id"),
+        event_id=event_id,
+    )
+    return Response({
+        "success": True,
+        "message": "Evento obtenido con éxito.",
+        "data": EventDetailSerializer(event).data,
+    }, status=status.HTTP_200_OK)
+
+
 @require_permission(endpoint="article", action="view")
 def list_articles(request):
-    #  switch por perfiles
-    profile = str(request.user.get("profile_id"))
+    try:
+        profile_id = int(request.user.get("profile_id"))
+    except (TypeError, ValueError):
+        profile_id = None
+    profile_name = Profile.objects.filter(profile_id=profile_id).values_list(
+        "profile_name", flat=True
+    ).first()
     user = request.user.get("user_id")
     articles = []
-    match profile:
-        case "1":
+    match profile_name:
+        case "ADMIN":
             articles = queryDB("""
                 select 
                     ar.*,
@@ -46,14 +137,14 @@ def list_articles(request):
                     on tp.topic_id = ar.topic_id
             """, None)
 
-        case "2":
+        case "MEMBER":
             articles = (
                 Article.objects
                 .select_related("topic_id", "article_created_by")
                 .prefetch_related("attachments")
                 .filter(article_active=True)
             )
-        case "3":
+        case "AUTHOR":
             articles = queryDB("""
                 select 
                     ar.*,
@@ -232,3 +323,187 @@ def delete_article(request, article_id):
     except Article.DoesNotExist:
         return JsonResponse({"detail": "Artículo no encontrado."}, status=404)
 
+
+def _can_evaluate(request, permission):
+    user = getattr(request, "user", None)
+    return bool(
+        getattr(user, "is_authenticated", False)
+        and user.has_perm_on("evaluation", permission)
+    )
+
+
+def _evaluation_payload(review):
+    article = review.article
+    attachment = review.article_attached
+    if attachment is None:
+        attachment = article.attachments.filter(
+            article_attached_active=True,
+            article_attached_delete=False,
+        ).order_by("-article_attached_id").first()
+
+    status_map = {
+        "PENDING": "PENDIENTE",
+        "IN_REVIEW": "EN_REVISION",
+        "APPROVED": "APROBADO",
+        "REJECTED": "RECHAZADO",
+    }
+    pdf_url = attachment.article_attached_url if attachment else None
+    pdf_name = pdf_url.rstrip("/").split("/")[-1].split("?")[0] if pdf_url else None
+
+    return {
+        "id": review.article_reviewer_id,
+        "articleId": article.article_id,
+        "title": article.article_subject,
+        "author": (
+            f"{article.article_created_by.user_name} {article.article_created_by.user_lastname}"
+            if article.article_created_by else ""
+        ).strip(),
+        "category": article.topic_id.topic_subject if article.topic_id else "",
+        "summary": article.article_description,
+        "deadline": str(review.evaluation_deadline) if review.evaluation_deadline else None,
+        "status": status_map.get(review.status, review.status),
+        "comments": review.comment or "",
+        "verdict": status_map.get(review.status, review.status),
+        "pdfSignedUrl": pdf_url,
+        "pdfFileName": pdf_name,
+    }
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def assigned_evaluations(request):
+    if not _can_evaluate(request, "view"):
+        return Response({"detail": "No tienes permiso para consultar evaluaciones."}, status=403)
+
+    reviews = (
+        ArticleReviewer.objects.select_related(
+            "article", "article__topic_id", "article__article_created_by",
+            "article_attached", "user",
+        )
+        .filter(
+            user=request.user,
+            article_reviewer_active=True,
+            article_reviewer_delete=False,
+            article__article_active=True,
+            article__article_delete=False,
+        )
+    )
+    return Response([_evaluation_payload(review) for review in reviews], status=200)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def assigned_evaluation_detail(request, review_id):
+    if not _can_evaluate(request, "view"):
+        return Response({"detail": "No tienes permiso para consultar evaluaciones."}, status=403)
+
+    review = (
+        ArticleReviewer.objects.select_related(
+            "article", "article__topic_id", "article__article_created_by", "article_attached",
+        )
+        .filter(
+            article_reviewer_id=review_id,
+            user=request.user,
+            article_reviewer_active=True,
+            article_reviewer_delete=False,
+            article__article_active=True,
+            article__article_delete=False,
+        )
+        .first()
+    )
+    if review is None:
+        return Response({"detail": "La evaluación no está asignada a tu cuenta."}, status=404)
+
+    if review.status == "PENDING":
+        review.status = "IN_REVIEW"
+        review.article_reviewer_updated_by = request.user
+        review.article_reviewer_updated_at = timezone.now()
+        review.save(update_fields=[
+            "status", "article_reviewer_updated_by", "article_reviewer_updated_at"
+        ])
+
+    return Response(_evaluation_payload(review), status=200)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def submit_evaluation_verdict(request, review_id):
+    if not _can_evaluate(request, "update"):
+        return Response({"detail": "No tienes permiso para emitir veredictos."}, status=403)
+
+    review = ArticleReviewer.objects.select_related("article").filter(
+        article_reviewer_id=review_id,
+        user=request.user,
+        article_reviewer_active=True,
+        article_reviewer_delete=False,
+        article__article_active=True,
+        article__article_delete=False,
+    ).first()
+    if review is None:
+        return Response({"detail": "La evaluación no está asignada a tu cuenta."}, status=404)
+
+    if review.status in ("APPROVED", "REJECTED"):
+        return Response({"detail": "El veredicto ya fue registrado y no puede modificarse."}, status=409)
+
+    verdict = str(request.data.get("verdict") or "").strip().upper()
+    comments = str(request.data.get("comments") or "").strip()
+
+    if verdict not in ("APPROVED", "REJECTED", "APROBADO", "RECHAZADO"):
+        return Response({"detail": "El veredicto debe ser APROBADO o RECHAZADO."}, status=400)
+    if not comments:
+        return Response({"detail": "Los comentarios cualitativos son obligatorios."}, status=400)
+
+    review.status = "APPROVED" if verdict in ("APPROVED", "APROBADO") else "REJECTED"
+    review.comment = comments
+    review.article_reviewer_updated_by = request.user
+    review.article_reviewer_updated_at = timezone.now()
+    review.save(update_fields=[
+        "status", "comment", "article_reviewer_updated_by", "article_reviewer_updated_at"
+    ])
+    return Response(_evaluation_payload(review), status=200)
+
+# ==============================================================================
+# VISTAS DE LA SCRUM-176 (ARTÍCULOS POR TÓPICO Y REORDENAMIENTO)
+# ==============================================================================
+class ArticleReorderView(APIView):
+    """
+    POST /api/v1/article/reorder/
+    Recibe una lista de IDs en el nuevo orden y actualiza la base de datos.
+    """
+    authentication_classes = []
+    permission_classes = []
+
+    @require_permission_drf(endpoint="article", action="update")
+    def post(self, request):
+        serializer = ArticleReorderSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        ordered_ids = serializer.validated_data['ordered_ids']
+
+        for index, article_id in enumerate(ordered_ids):
+            Article.objects.filter(article_id=article_id).update(article_order=index)
+
+        return Response({"detail": "Orden actualizado correctamente."}, status=status.HTTP_200_OK)
+
+
+class ArticleByTopicListView(APIView):
+    """
+    GET /api/v1/article/topics/{topic_id}/articles/
+    Lista los artículos de un tópico específico.
+    """
+    authentication_classes = []
+    permission_classes = []
+
+    @require_permission_drf(endpoint="article", action="view")
+    def get(self, request, topic_id):
+        topic = get_object_or_404(Topic, topic_id=topic_id, topic_active=True, topic_delete=False)
+        articles = Article.objects.filter(
+            topic_id=topic,
+            article_active=True,
+            article_delete=False
+        ).order_by('article_order')
+
+        return Response({
+            "success": True,
+            "message": f"Artículos del tópico {topic.topic_subject} obtenidos.",
+            "data": [a.to_dict() for a in articles]
+        }, status=200)

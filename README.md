@@ -120,7 +120,7 @@ La instalación inicial de las herramientas y la preparación del entorno virtua
 
 El proyecto Django fue inicializado y se configuró la conexión con PostgreSQL. La ejecución de las migraciones iniciales permitió preparar las tablas internas requeridas por Django.
 
-La implementación de endpoints y funcionalidades de negocio se desarrollará posteriormente de acuerdo con el cronograma del proyecto.
+Las funcionalidades de negocio se desarrollan progresivamente de acuerdo con el cronograma del proyecto.
 
 Las credenciales de conexión a la base de datos deben mantenerse fuera del repositorio y no deben publicarse en GitHub.
 
@@ -153,3 +153,21 @@ DEMO_USER_PASSWORD=DemoPass123!
 únicamente la clave pública (`VITE_RECAPTCHA_SITE_KEY`). Las credenciales
 `DEMO_USER_*` son temporales para pruebas locales, hasta integrar el sistema de
 usuarios real.
+
+## Eventos de conferencia
+
+Las rutas de consulta requieren autenticación Bearer y están disponibles para cualquier
+usuario autenticado. La creación y actualización requieren permiso `event:create` o
+`event:update`, disponible para Admin y Comité (`MEMBER`):
+
+```text
+GET    /api/v1/events/
+POST   /api/v1/events/
+GET    /api/v1/events/{event_id}/
+PUT    /api/v1/events/{event_id}/
+PATCH  /api/v1/events/{event_id}/
+```
+
+El detalle agrega `schedule` (cronograma con tópico asociado) y `topics` (tópicos
+únicos). En creación y actualización, enviar `schedule` reemplaza el cronograma completo;
+si se omite en un `PATCH`, se conserva el cronograma actual.

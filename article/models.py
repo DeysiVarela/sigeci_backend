@@ -1,3 +1,5 @@
+import uuid
+
 from django.db import models
 from util.uploads.uploads import generate_download_url
 
@@ -64,6 +66,9 @@ class Article(models.Model):
     article_copyright_url = models.URLField(blank=True, null=True)
     article_active = models.BooleanField(default=True)
     article_delete = models.BooleanField(default=False)
+    article_order = models.IntegerField(default=0)
+    # SCRUM-31: código con el que se verifica el certificado de publicación (único por artículo)
+    verification_code = models.UUIDField(default=uuid.uuid4, editable=False, null=True, blank=True, unique=True)
 
     # Campos de auditoría
     article_created_by = models.ForeignKey(
@@ -115,6 +120,7 @@ class Article(models.Model):
             "article_copyright_url": self.article_copyright_url,
             "article_active": self.article_active,
             "article_delete": self.article_delete,
+            "article_order": self.article_order,
             "article_created_by": self.article_created_by_id,
             "article_created_by_name": created_by_name,
             "article_created_at": self.article_created_at.isoformat() if self.article_created_at else None,
@@ -214,6 +220,7 @@ class ArticleReviewer(models.Model):
     )
     status = models.CharField(max_length=50, choices=STATUS_CHOICES, default="IN_REVIEW")
     comment = models.TextField(blank=True, null=True)
+    evaluation_deadline = models.DateField(null=True, blank=True)
     article_reviewer_active = models.BooleanField(default=True)
     article_reviewer_delete = models.BooleanField(default=False)
 
@@ -259,3 +266,63 @@ class ArticleReviewer(models.Model):
             "article_reviewer_updated_by": self.article_reviewer_updated_by_id,
             "article_reviewer_updated_at": self.article_reviewer_updated_at.isoformat() if self.article_reviewer_updated_at else None,
         }
+
+
+class Event(models.Model):
+    event_id = models.AutoField(primary_key=True)
+    event_name = models.CharField(max_length=200)
+    event_description = models.TextField(blank=True, null=True)
+    event_address = models.CharField(max_length=255, blank=True, null=True)
+    event_date = models.DateTimeField()
+    event_created_by = models.ForeignKey(
+        "accounts.User",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        db_column="event_created_by",
+        related_name="+",
+    )
+    event_created_at = models.DateTimeField(auto_now_add=True)
+    event_updated_by = models.ForeignKey(
+        "accounts.User",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        db_column="event_updated_by",
+        related_name="+",
+    )
+    event_updated_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "event"
+        ordering = ["event_date", "event_id"]
+
+    def __str__(self):
+        return f"{self.event_id}: {self.event_name}"
+
+
+class Schedule(models.Model):
+    schedule_id = models.AutoField(primary_key=True)
+    event = models.ForeignKey(
+        Event,
+        on_delete=models.CASCADE,
+        db_column="event_id",
+        related_name="schedule_items",
+    )
+    topic_id = models.ForeignKey(
+        Topic,
+        null=True,
+        blank=True,
+        on_delete=models.RESTRICT,
+        db_column="topic_id",
+        related_name="schedule_items",
+    )
+    application_id = models.IntegerField(null=True, blank=True)
+    schedule_hour = models.TimeField()
+
+    class Meta:
+        db_table = "schedule"
+        ordering = ["schedule_hour", "schedule_id"]
+
+    def __str__(self):
+        return f"Schedule {self.schedule_id} - Event {self.event_id}"

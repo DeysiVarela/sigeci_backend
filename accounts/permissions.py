@@ -27,3 +27,24 @@ class HasProfilePermission(BasePermission):
         if permission is None:
             return False
         return user.has_perm_on(view.permission_resource, permission)
+
+
+def profile_permission(resource, permission):
+    """
+    Permiso de matriz para vistas que no son ViewSet (APIView): exige `permission` sobre `resource`
+    considerando TODOS los roles del usuario (User.has_perm_on). Falla cerrado: sin fila en la matriz => 403.
+
+        permission_classes = [IsAuthenticated, profile_permission("me", "delete")]
+    """
+
+    class _HasProfilePermission(BasePermission):
+        message = "No tienes permiso para realizar esta acción."
+
+        def has_permission(self, request, view):
+            user = request.user
+            if not user or not getattr(user, "is_authenticated", False):
+                return False
+            return user.has_perm_on(resource, permission)
+
+    _HasProfilePermission.__name__ = f"Has_{resource}_{permission}"
+    return _HasProfilePermission
