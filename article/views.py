@@ -36,7 +36,7 @@ def list_articles(request):
     user = request.user.get("user_id")
     articles = []
     match profile:
-        case "1":
+        case "1": # admin
             articles = queryDB("""
                 select 
                     ar.*,
@@ -45,15 +45,14 @@ def list_articles(request):
                 inner join topic tp
                     on tp.topic_id = ar.topic_id
             """, None)
-
-        case "2":
+        case "2": # reviewer
             articles = (
                 Article.objects
                 .select_related("topic_id", "article_created_by")
                 .prefetch_related("attachments")
                 .filter(article_active=True)
             )
-        case "3":
+        case "3": # author
             articles = queryDB("""
                 select 
                     ar.*,
