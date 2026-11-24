@@ -14,6 +14,7 @@ MATRIX = {
         "article": ["view", "create", "update", "delete", "active", "inactive", "download"],
         "event": ["view", "create", "update", "delete", "active", "inactive"],
         "application": ["view", "create", "update", "delete", "active", "inactive", "download"],
+        "me": ["view", "delete"],  # "me": mi propia cuenta (view = /auth/me, delete = SCRUM-129)
     },
     # MEMBER = miembro del comité científico: gestiona usuarios, salvo cuentas y rol de
     # administrador (regla en users/views.py y users/serializers.py).
@@ -24,11 +25,13 @@ MATRIX = {
         "event": ["view"],
         "application": ["view"],
         "evaluation": ["view", "update"],
+        "me": ["view", "delete"],
     },
     "AUTHOR": {
         "article": ["view", "create", "update", "download"],
         "event": ["view"],
         "application": ["view", "create", "update"],
+        "me": ["view", "delete"],
     },
 }
 

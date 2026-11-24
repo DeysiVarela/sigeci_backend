@@ -1,0 +1,42 @@
+info:
+  name: SCRUM-129 · Eliminar mi cuenta (200)
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{apiUrl}}/users/me/delete/"
+  headers:
+    - name: Authorization
+      value: "Bearer {{token}}"
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "password": "{{passwordActual}}"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+docs: |-
+  SCRUM-129 · POST /api/users/me/delete/
+  Base: {{apiUrl}} (= http://localhost:8000/api, SIN /v1: esta ruta vive en la app accounts).
+  Seguridad (backend): sesión válida + permiso de matriz "me:delete" + contraseña actual.
+  Cabecera: Authorization: Bearer <token>  (con "Bearer"; DRF no acepta el token pelado).
+
+  ⚠ DESTRUCTIVO: desactiva la cuenta del token que uses. Prueba con un usuario desechable.
+
+  Respuestas:
+  200 {"detail": "Tu cuenta ha sido desactivada."} (el token deja de servir en /api y en /api/v1)
+  400 contraseña incorrecta/faltante, o único administrador activo
+  401 sin token o token inválido
+  403 el rol no tiene me:delete en la matriz
+  429 demasiados intentos (5/min)

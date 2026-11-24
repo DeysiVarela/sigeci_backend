@@ -1,0 +1,33 @@
+info:
+  name: SCRUM-129 · Sin permiso me:delete (403)
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{apiUrl}}/users/me/delete/"
+  headers:
+    - name: Authorization
+      value: "Bearer {{tokenSinPermiso}}"
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "password": "cualquiera"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+docs: |-
+  Prueba de seguridad: token válido de un usuario cuyo rol NO tiene "me:delete" en profile_action.
+  Pon ese token en la variable de entorno tokenSinPermiso.
+  Esperado: 403 {"detail": "No tienes permiso para realizar esta acción."} y la cuenta NO cambia.
+  El permiso se valida ANTES que la contraseña, así que este endpoint no sirve para adivinarla.
