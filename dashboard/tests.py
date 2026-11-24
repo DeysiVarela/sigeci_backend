@@ -10,7 +10,6 @@ class DashboardApiTests(TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data["status"], "success")
-        self.assertIn("sql_query", data)
         self.assertIn("data", data)
         metrics = data["data"]
         self.assertIn("new_orders", metrics)

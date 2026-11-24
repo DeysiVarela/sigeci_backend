@@ -9,6 +9,7 @@ from rest_framework.views import APIView
 
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
+from accounts.models import Profile
 from util.auth_service import require_permission, require_permission_drf
 from util.uploads.uploads import delete_file
 from util.utilDB import queryDB
@@ -116,11 +117,17 @@ def event_detail(request, event_id):
 
 @require_permission(endpoint="article", action="view")
 def list_articles(request):
-    profile = str(request.user.get("profile_id"))
+    try:
+        profile_id = int(request.user.get("profile_id"))
+    except (TypeError, ValueError):
+        profile_id = None
+    profile_name = Profile.objects.filter(profile_id=profile_id).values_list(
+        "profile_name", flat=True
+    ).first()
     user = request.user.get("user_id")
     articles = []
-    match profile:
-        case "1":
+    match profile_name:
+        case "ADMIN":
             articles = queryDB("""
                 select 
                     ar.*,
@@ -130,14 +137,14 @@ def list_articles(request):
                     on tp.topic_id = ar.topic_id
             """, None)
 
-        case "2":
+        case "MEMBER":
             articles = (
                 Article.objects
                 .select_related("topic_id", "article_created_by")
                 .prefetch_related("attachments")
                 .filter(article_active=True)
             )
-        case "3":
+        case "AUTHOR":
             articles = queryDB("""
                 select 
                     ar.*,
