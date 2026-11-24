@@ -3,34 +3,7 @@ variables:
   - name: url
     value: http://localhost:8000/api/v1
   - name: token
-    value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzk1MzMzNTA1LCJpYXQiOjE3OTUzMzE3MDUsImp0aSI6ImUwYWEyZjAxNGFjOTQ0NWRiMmI5NzA5YTBmYWFjZjFlIiwidXNlcl9pZCI6OCwidXNlcl9zZWVkX3Rva2VuIjoiZmIwZjgxNzYtYjM3Yi00YTUzLWE0OWItOGMwZWRiZjUyYTMwIn0.S6Crakz66y0j2m3hyBUEFI4XOMcr3RI39BWLYicOLqY
+    value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzk1NTU2OTgxLCJpYXQiOjE3OTU1NTUxODEsImp0aSI6ImJkZDA3NGQzYzI1NTRjNDZiZGE1ZGE0MDc5Y2ZjNDEwIiwidXNlcl9pZCI6OCwidXNlcl9zZWVkX3Rva2VuIjoiZmIwZjgxNzYtYjM3Yi00YTUzLWE0OWItOGMwZWRiZjUyYTMwIn0.DerZzITB4AM8Pz8i14zRG9s-e6c3t48g6RGNHjC0tLo
   - name: url
     value: https://sigeci-backend.onrender.com/api/v1
     disabled: true
-    description: ""
-  - name: evaluationUrl
-    value: http://localhost:8000/api
-    description: "Base para los endpoints de evaluaciones SCRUM-32."
-  - name: evaluationUrl
-    value: https://sigeci-backend.onrender.com/api
-    disabled: true
-    description: "Base remota para los endpoints de evaluaciones SCRUM-32."
-  - name: reviewId
-    value: "1"
-    description: "ID de la asignación ArticleReviewer."
-  - name: apiUrl
-    value: http://localhost:8000/api
-    description: "Base de la app accounts (usuarios, /me, /me/delete). Sin /v1."
-  - name: apiUrl
-    value: https://sigeci-backend.onrender.com/api
-    disabled: true
-    description: "Base remota de la app accounts."
-  - name: passwordActual
-    value: ""
-    description: "Contraseña del usuario dueño de {{token}} (solo para probar SCRUM-129). No la subas al repo."
-  - name: tokenSinPermiso
-    value: ""
-    description: "Access token de un usuario cuyo rol NO tiene me:delete (prueba del 403)."
-  - name: articleId
-    value: "1"
-    description: "ID del artículo para las pruebas de versiones (SCRUM-30/31)."

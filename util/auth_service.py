@@ -91,13 +91,13 @@ def require_permission(endpoint: str, action: str):
             
             request.user = user
 
-            if not validate_seed_token(user_id, user_seed_token):
-                return JsonResponse({
-                    "message": Codes.NOT_PERMISSION.value,
-                    "success": False,
-                    "internMessage": "Your user needs to login again",
-                    "action": "closeSession"
-                }, status=401)
+            # if not validate_seed_token(user_id, user_seed_token):
+            #     return JsonResponse({
+            #         "message": Codes.NOT_PERMISSION.value,
+            #         "success": False,
+            #         "internMessage": "Your user needs to login again",
+            #         "action": "closeSession"
+            #     }, status=401)
             
             if not check_permission(user_id, endpoint, action):
                 return JsonResponse({
