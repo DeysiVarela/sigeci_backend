@@ -22,7 +22,7 @@ MATRIX = {
         "user": ["view", "create", "update", "delete", "active", "inactive"],
         "user_role": ["update"],
         "article": ["view", "download"],
-        "event": ["view"],
+        "event": ["view", "create", "update"],
         "application": ["view"],
         "evaluation": ["view", "update"],
         "me": ["view", "delete"],

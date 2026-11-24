@@ -11,6 +11,8 @@ from .views import (
     submit_evaluation_verdict,
     ArticleByTopicListView,
     ArticleReorderView,
+    list_events,
+    event_detail,
 )
 
 urlpatterns = [
@@ -18,6 +20,10 @@ urlpatterns = [
     re_path(r"^evaluations/assigned/(?P<review_id>\d+)/?$", assigned_evaluation_detail, name="evaluation-assigned-detail"),
     re_path(r"^evaluations/assigned/(?P<review_id>\d+)/verdict/?$", submit_evaluation_verdict, name="evaluation-verdict"),
     re_path(r"^topic/?$", list_topics, name='topic-list'),
+    re_path(r"^event/?$", list_events, name="event-list"),
+    re_path(r"^event/(?P<event_id>\d+)/?$", event_detail, name="event-detail"),
+    re_path(r"^events/?$", list_events, name="events-list"),
+    re_path(r"^events/(?P<event_id>\d+)/?$", event_detail, name="events-detail"),
     re_path(r"^article/?$", list_articles, name='article-list'),
     re_path(r"^article/create/?$", create_article, name='article-create'),
     re_path(r"^article/(?P<article_id>\d+)/?$", detail_article, name='article-detail'),

@@ -13,8 +13,13 @@ from util.auth_service import require_permission, require_permission_drf
 from util.uploads.uploads import delete_file
 from util.utilDB import queryDB
 
-from .models import Article, ArticleAttached, ArticleReviewer, Topic
-from .serializers import ArticleReorderSerializer
+from .models import Article, ArticleAttached, ArticleReviewer, Event, Topic
+from .serializers import (
+    ArticleReorderSerializer,
+    EventDetailSerializer,
+    EventSerializer,
+    EventWriteSerializer,
+)
 
 
 def _parse_body(request):
@@ -34,6 +39,79 @@ def list_topics(request):
         "message": "Temas obtenidos con éxito.",
         "data": [t.to_dict() for t in topics]
     }, safe=False, status=200)
+
+
+@api_view(["GET", "POST"])
+@permission_classes([IsAuthenticated])
+def list_events(request):
+    if request.method == "POST":
+        if not request.user.has_perm_on("event", "create"):
+            return Response(
+                {"success": False, "message": "No tienes permiso para crear eventos."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        serializer = EventWriteSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(
+                {"success": False, "message": "Los datos del evento no son válidos.", "errors": serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        event = serializer.save(event_created_by=request.user)
+        event = Event.objects.prefetch_related("schedule_items__topic_id").get(pk=event.pk)
+        return Response({
+            "success": True,
+            "message": "Evento creado con éxito.",
+            "data": EventDetailSerializer(event).data,
+        }, status=status.HTTP_201_CREATED)
+
+    events = Event.objects.order_by("event_date", "event_id")
+    return Response({
+        "success": True,
+        "message": "Eventos obtenidos con éxito.",
+        "data": EventSerializer(events, many=True).data,
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(["GET", "PUT", "PATCH"])
+@permission_classes([IsAuthenticated])
+def event_detail(request, event_id):
+    event = get_object_or_404(Event, event_id=event_id)
+    if request.method in ("PUT", "PATCH"):
+        if not request.user.has_perm_on("event", "update"):
+            return Response(
+                {"success": False, "message": "No tienes permiso para actualizar eventos."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        serializer = EventWriteSerializer(
+            event,
+            data=request.data,
+            partial=request.method == "PATCH",
+        )
+        if not serializer.is_valid():
+            return Response(
+                {"success": False, "message": "Los datos del evento no son válidos.", "errors": serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        event = serializer.save(
+            event_updated_by=request.user,
+            event_updated_at=timezone.now(),
+        )
+        event = Event.objects.prefetch_related("schedule_items__topic_id").get(pk=event.pk)
+        return Response({
+            "success": True,
+            "message": "Evento actualizado con éxito.",
+            "data": EventDetailSerializer(event).data,
+        }, status=status.HTTP_200_OK)
+
+    event = get_object_or_404(
+        Event.objects.prefetch_related("schedule_items__topic_id"),
+        event_id=event_id,
+    )
+    return Response({
+        "success": True,
+        "message": "Evento obtenido con éxito.",
+        "data": EventDetailSerializer(event).data,
+    }, status=status.HTTP_200_OK)
 
 
 @require_permission(endpoint="article", action="view")

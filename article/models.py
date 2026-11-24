@@ -262,3 +262,63 @@ class ArticleReviewer(models.Model):
             "article_reviewer_updated_by": self.article_reviewer_updated_by_id,
             "article_reviewer_updated_at": self.article_reviewer_updated_at.isoformat() if self.article_reviewer_updated_at else None,
         }
+
+
+class Event(models.Model):
+    event_id = models.AutoField(primary_key=True)
+    event_name = models.CharField(max_length=200)
+    event_description = models.TextField(blank=True, null=True)
+    event_address = models.CharField(max_length=255, blank=True, null=True)
+    event_date = models.DateTimeField()
+    event_created_by = models.ForeignKey(
+        "accounts.User",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        db_column="event_created_by",
+        related_name="+",
+    )
+    event_created_at = models.DateTimeField(auto_now_add=True)
+    event_updated_by = models.ForeignKey(
+        "accounts.User",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        db_column="event_updated_by",
+        related_name="+",
+    )
+    event_updated_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "event"
+        ordering = ["event_date", "event_id"]
+
+    def __str__(self):
+        return f"{self.event_id}: {self.event_name}"
+
+
+class Schedule(models.Model):
+    schedule_id = models.AutoField(primary_key=True)
+    event = models.ForeignKey(
+        Event,
+        on_delete=models.CASCADE,
+        db_column="event_id",
+        related_name="schedule_items",
+    )
+    topic_id = models.ForeignKey(
+        Topic,
+        null=True,
+        blank=True,
+        on_delete=models.RESTRICT,
+        db_column="topic_id",
+        related_name="schedule_items",
+    )
+    application_id = models.IntegerField(null=True, blank=True)
+    schedule_hour = models.TimeField()
+
+    class Meta:
+        db_table = "schedule"
+        ordering = ["schedule_hour", "schedule_id"]
+
+    def __str__(self):
+        return f"Schedule {self.schedule_id} - Event {self.event_id}"

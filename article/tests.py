@@ -1,11 +1,11 @@
 import json
 from django.test import TestCase, Client, override_settings
 from django.urls import reverse
-from datetime import date
+from datetime import date, time
 from rest_framework.test import APITestCase
 from django.core.management import call_command
 from accounts.models import Profile, User
-from .models import Article, ArticleAttached, ArticleReviewer, Topic
+from .models import Article, ArticleAttached, ArticleReviewer, Event, Schedule, Topic
 
 
 @override_settings(CAPTCHA_REQUIRED=False)
@@ -96,6 +96,181 @@ class ArticleCrudTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertFalse(Article.objects.filter(pk=self.article.article_id).exists())
+
+
+class EventReadTests(APITestCase):
+    def setUp(self):
+        self.user = User(
+            user_name="Usuario",
+            user_lastname="Eventos",
+            user_email="event-reader@test.local",
+        )
+        self.user.set_password("Clave.Segura1")
+        self.user.save()
+        self.client.force_authenticate(user=self.user)
+
+        self.topic = Topic.objects.create(
+            topic_subject="Inteligencia Artificial",
+            topic_description="Modelos y aplicaciones de IA.",
+        )
+        self.event = Event.objects.create(
+            event_name="Congreso SIGECI",
+            event_description="Conferencia académica.",
+            event_address="Universidad del Valle",
+            event_date="2026-12-10T09:00:00Z",
+        )
+        Schedule.objects.create(
+            event=self.event,
+            topic_id=self.topic,
+            schedule_hour=time(9, 30),
+        )
+
+    def test_list_events(self):
+        response = self.client.get("/api/v1/event/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["data"][0]["event_id"], self.event.event_id)
+        self.assertEqual(response.data["data"][0]["event_name"], "Congreso SIGECI")
+
+    def test_plural_event_routes(self):
+        list_response = self.client.get("/api/v1/events/")
+        detail_response = self.client.get(f"/api/v1/events/{self.event.event_id}/")
+
+        self.assertEqual(list_response.status_code, 200)
+        self.assertEqual(detail_response.status_code, 200)
+        self.assertEqual(detail_response.data["data"]["event_id"], self.event.event_id)
+
+    def test_event_detail_includes_schedule_and_topics(self):
+        response = self.client.get(f"/api/v1/event/{self.event.event_id}/")
+
+        self.assertEqual(response.status_code, 200)
+        data = response.data["data"]
+        self.assertEqual(data["schedule"][0]["schedule_hour"], "09:30:00")
+        self.assertEqual(data["schedule"][0]["topic"]["topic_id"], self.topic.topic_id)
+        self.assertEqual(data["topics"][0]["topic_subject"], "Inteligencia Artificial")
+
+    def test_event_detail_returns_not_found(self):
+        response = self.client.get("/api/v1/event/999999/")
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_event_list_requires_authentication(self):
+        self.client.force_authenticate(user=None)
+
+        response = self.client.get("/api/v1/event/")
+
+        self.assertEqual(response.status_code, 401)
+
+
+class EventWriteTests(APITestCase):
+    def setUp(self):
+        call_command("seed_accounts")
+        self.member = self.make_user("committee-events@test.local", "MEMBER")
+        self.author = self.make_user("author-events@test.local", "AUTHOR")
+        self.topic = Topic.objects.create(topic_subject="Inteligencia Artificial")
+        self.other_topic = Topic.objects.create(topic_subject="Ciberseguridad")
+        self.event = Event.objects.create(
+            event_name="Evento original",
+            event_date="2026-12-10T09:00:00Z",
+        )
+        Schedule.objects.create(
+            event=self.event,
+            topic_id=self.topic,
+            schedule_hour=time(9, 0),
+            application_id=55,
+        )
+
+    def make_user(self, email, profile_name):
+        user = User(
+            user_name="Usuario",
+            user_lastname="Eventos",
+            user_email=email,
+        )
+        user.set_password("Clave.Segura1")
+        user.save()
+        user.profiles.add(Profile.objects.get(profile_name=profile_name))
+        return user
+
+    def test_committee_can_create_event_with_schedule(self):
+        self.client.force_authenticate(user=self.member)
+        response = self.client.post(
+            "/api/v1/events/",
+            {
+                "event_name": "Nuevo congreso",
+                "event_description": "Descripción",
+                "event_address": "Cali",
+                "event_date": "2026-12-12T10:00:00Z",
+                "schedule": [{
+                    "topic_id": self.topic.topic_id,
+                    "schedule_hour": "10:30:00",
+                }],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["data"]["schedule"][0]["topic_id"], self.topic.topic_id)
+        self.assertEqual(Event.objects.get(event_name="Nuevo congreso").schedule_items.count(), 1)
+
+    def test_committee_can_update_event_and_replace_schedule(self):
+        self.client.force_authenticate(user=self.member)
+        response = self.client.patch(
+            f"/api/v1/events/{self.event.event_id}/",
+            {
+                "event_name": "Evento actualizado",
+                "schedule": [{
+                    "schedule_id": self.event.schedule_items.get().schedule_id,
+                    "topic_id": self.other_topic.topic_id,
+                    "schedule_hour": "11:00:00",
+                }],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.event.refresh_from_db()
+        self.assertEqual(self.event.event_name, "Evento actualizado")
+        self.assertEqual(self.event.schedule_items.count(), 1)
+        self.assertEqual(self.event.schedule_items.get().topic_id_id, self.other_topic.topic_id)
+        self.assertEqual(self.event.schedule_items.get().application_id, 55)
+
+    def test_author_cannot_create_or_update_events(self):
+        self.client.force_authenticate(user=self.author)
+        payload = {
+            "event_name": "No autorizado",
+            "event_date": "2026-12-12T10:00:00Z",
+        }
+
+        create_response = self.client.post("/api/v1/events/", payload, format="json")
+        update_response = self.client.patch(
+            f"/api/v1/events/{self.event.event_id}/",
+            {"event_name": "No autorizado"},
+            format="json",
+        )
+
+        self.assertEqual(create_response.status_code, 403)
+        self.assertEqual(update_response.status_code, 403)
+        self.assertFalse(Event.objects.filter(event_name="No autorizado").exists())
+
+    def test_invalid_schedule_does_not_create_event(self):
+        self.client.force_authenticate(user=self.member)
+
+        response = self.client.post(
+            "/api/v1/events/",
+            {
+                "event_name": "Evento inválido",
+                "event_date": "2026-12-12T10:00:00Z",
+                "schedule": [{"topic_id": 999999, "schedule_hour": "10:30:00"}],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(Event.objects.filter(event_name="Evento inválido").exists())
+
+    def test_member_has_event_write_permissions(self):
+        self.assertTrue(self.member.has_perm_on("event", "create"))
+        self.assertTrue(self.member.has_perm_on("event", "update"))
 
 
 @override_settings(CAPTCHA_REQUIRED=False)
