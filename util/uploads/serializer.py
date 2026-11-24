@@ -8,7 +8,7 @@ ALLOWED = {
     ".jpeg": "image/jpeg",
 }
 
-MAX_SIZE = 20 * 1024 * 1024
+MAX_SIZE = 10 * 1024 * 1024
 
 class SignUploadSerializer(serializers.Serializer):
     # Solo letras, números, _ y -, separados por "/". Bloquea "..", "/" inicial, etc.
