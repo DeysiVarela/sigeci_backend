@@ -1,0 +1,36 @@
+info:
+  name: SCRUM-30 · Aval de presentación (POST)
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{apiUrl}}/articles/{{articleId}}/aval-presentation/"
+  headers:
+    - name: Authorization
+      value: "Bearer {{token}}"
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "comment": "Buen trabajo."
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+docs: |-
+  Base: {{apiUrl}} (= http://localhost:8000/api, SIN /v1) y {{articleId}} = id del artículo.
+  Cabecera: Authorization: Bearer <token> (con "Bearer"; esta ruta es DRF).
+  Seguridad: sesión (401) + permiso de matriz (403) + regla por objeto (403). La URL sola no sirve.
+  
+  Matriz: evaluation:update (ADMIN y MEMBER). Objeto: comité o evaluador asignado activo; el AUTOR no puede avalar su artículo.
+  200 -> PDF "Constancia de Aval" (en Bruno se ve como binario: usa Save response)
+  400 comentario inválido · 401 · 403 · 404 · 409 estado REJECTED/FOR_PUBLICATION

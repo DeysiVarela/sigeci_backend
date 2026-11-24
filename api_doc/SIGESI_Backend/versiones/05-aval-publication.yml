@@ -1,0 +1,35 @@
+info:
+  name: SCRUM-31 · Aval de publicación (POST)
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: "{{apiUrl}}/articles/{{articleId}}/aval-publication/"
+  headers:
+    - name: Authorization
+      value: "Bearer {{token}}"
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {}
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+docs: |-
+  Base: {{apiUrl}} (= http://localhost:8000/api, SIN /v1) y {{articleId}} = id del artículo.
+  Cabecera: Authorization: Bearer <token> (con "Bearer"; esta ruta es DRF).
+  Seguridad: sesión (401) + permiso de matriz (403) + regla por objeto (403). La URL sola no sirve.
+  
+  Matriz: evaluation:update. Objeto: comité o evaluador asignado activo; no el autor.
+  Requiere que el autor ya haya subido el copyright.
+  200 -> PDF "Certificado de Publicación" con código de verificación
+  400 falta copyright · 401 · 403 · 404 · 409 evaluación RECHAZADA

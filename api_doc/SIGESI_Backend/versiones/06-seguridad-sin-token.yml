@@ -1,0 +1,20 @@
+info:
+  name: Seguridad · Sin token (401)
+  type: http
+  seq: 6
+
+http:
+  method: GET
+  url: "{{apiUrl}}/articles/{{articleId}}/corrected-version/"
+  headers: []
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+docs: |-
+  Prueba de seguridad: la URL por sí sola no sirve. Esperado: 401.

@@ -1,0 +1,36 @@
+info:
+  name: SCRUM-30 · Subir versión corregida (POST)
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{apiUrl}}/articles/{{articleId}}/corrected-version/"
+  headers:
+    - name: Authorization
+      value: "Bearer {{token}}"
+  body:
+    type: multipart-form
+    data:
+      - name: corrected_pdf
+        type: file
+        value:
+          - ./ejemplo-corregido.pdf
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+docs: |-
+  Base: {{apiUrl}} (= http://localhost:8000/api, SIN /v1) y {{articleId}} = id del artículo.
+  Cabecera: Authorization: Bearer <token> (con "Bearer"; esta ruta es DRF).
+  Seguridad: sesión (401) + permiso de matriz (403) + regla por objeto (403). La URL sola no sirve.
+  
+  Matriz: article:update. Objeto: SOLO el autor dueño del artículo (ni ADMIN ni MEMBER).
+  Cuerpo multipart: corrected_pdf (PDF real, máx 10 MB; se valida el contenido, no solo la extensión).
+  Si Bruno no toma el archivo: Body -> Multipart Form -> corrected_pdf -> File.
+  201 {detail, corrected_version} · 400 archivo inválido/vacío/grande/disfrazado · 401 · 403 · 404

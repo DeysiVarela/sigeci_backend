@@ -1,0 +1,39 @@
+info:
+  name: SCRUM-31 · Subir versión final + copyright (POST)
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{apiUrl}}/articles/{{articleId}}/final-submission/"
+  headers:
+    - name: Authorization
+      value: "Bearer {{token}}"
+  body:
+    type: multipart-form
+    data:
+      - name: final_pdf
+        type: file
+        value:
+          - ./ejemplo-final.pdf
+      - name: copyright_pdf
+        type: file
+        value:
+          - ./ejemplo-copyright.pdf
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
+
+docs: |-
+  Base: {{apiUrl}} (= http://localhost:8000/api, SIN /v1) y {{articleId}} = id del artículo.
+  Cabecera: Authorization: Bearer <token> (con "Bearer"; esta ruta es DRF).
+  Seguridad: sesión (401) + permiso de matriz (403) + regla por objeto (403). La URL sola no sirve.
+  
+  Matriz: article:update. Objeto: SOLO el autor dueño.
+  Cuerpo multipart: final_pdf (PDF) y copyright_pdf (PDF, JPG o PNG), máx 10 MB c/u.
+  201 {detail, copyright_url} · 400 · 401 · 403 · 404

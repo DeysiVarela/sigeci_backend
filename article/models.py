@@ -1,3 +1,5 @@
+import uuid
+
 from django.db import models
 from util.uploads.uploads import generate_download_url
 
@@ -65,6 +67,8 @@ class Article(models.Model):
     article_active = models.BooleanField(default=True)
     article_delete = models.BooleanField(default=False)
     article_order = models.IntegerField(default=0)
+    # SCRUM-31: código con el que se verifica el certificado de publicación (único por artículo)
+    verification_code = models.UUIDField(default=uuid.uuid4, editable=False, null=True, blank=True, unique=True)
 
     # Campos de auditoría
     article_created_by = models.ForeignKey(
