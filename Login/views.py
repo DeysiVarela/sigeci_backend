@@ -1,26 +1,25 @@
 import json
-import logging
+import time
 import math
 import secrets
-import time
+import logging
 from datetime import timedelta
-from util.auth_service import require_permission
 from util.utilDB import queryDB
-
-from util.enum.Codes import Codes
-
 from django.conf import settings
-from django.core.cache import cache
-from django.contrib.auth.hashers import check_password, make_password
 from django.db import transaction
-from django.http import JsonResponse
 from django.utils import timezone
-from django.views.decorators.csrf import csrf_exempt
-from rest_framework_simplejwt.exceptions import TokenError
-from rest_framework_simplejwt.tokens import RefreshToken
-
+from util.enum.Codes import Codes
+from django.core.cache import cache
+from django.http import JsonResponse
+from util.auth_service import require_permission
+from util.captcha_service import require_captcha
 from accounts.models import PasswordResetPin, User
+from django.views.decorators.csrf import csrf_exempt
 from accounts.users.serializers import UserSerializer
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.exceptions import TokenError
+from django.contrib.auth.hashers import check_password, make_password
+from notifications.services import PinEmailError, send_recovery_pin_email
 from accounts.views import (
     INVALID_CREDENTIALS,
     INVALID_PIN,
@@ -29,11 +28,8 @@ from accounts.views import (
     _resend_key,
     _user_payload,
 )
-from notifications.services import PinEmailError, send_recovery_pin_email
-from util.captcha_service import require_captcha
 
 logger = logging.getLogger(__name__)
-
 
 def _parse_body(request):
     try:
@@ -41,8 +37,6 @@ def _parse_body(request):
     except (ValueError, TypeError):
         return {}
 
-
-@csrf_exempt
 @require_captcha
 def login(request):
     """
@@ -92,49 +86,6 @@ def login(request):
         }
     }, status=200)
 
-
-@csrf_exempt
-@require_permission(endpoint="me", action="view")
-def me(request):
-    """
-    GET /api/v1/auth/me
-    Devuelve los datos y permisos del usuario autenticado a partir del JWT.
-    """
-    if request.method != "GET":
-        return JsonResponse({"detail": "Método no permitido.", "success": False}, status=405)
-
-    # ejecutar peticion a permisos para renderizar menu
-    profile = request.user.get("profile_id")
-
-    menu = queryDB("""
-        select
-            *
-        from profile_action pa 
-        inner join profile pr
-            on pr.profile_id = pa.profile_id
-            and pr.profile_active = true
-            and pr.profile_delete = false
-        where 
-            pa.profile_id = %s
-            and pa.profile_action_active = true
-            and pa.profile_action_delete = false
-    """, [profile])
-
-    if not menu:
-        return JsonResponse({
-            "success": False,
-            "message": "Usuario no encontrado o inactivo.",
-            "action": "closeSession"
-        }, status=401)
-
-    return JsonResponse({
-        "success": True,
-        "message": "Response OK",
-        "data": menu
-    }, status=200)
-
-
-@csrf_exempt
 def refresh_token(request):
     """
     POST /api/v1/auth/refresh o /api/v1/auth/refresh-token
@@ -185,8 +136,6 @@ def refresh_token(request):
         }
     }, status=200)
 
-
-@csrf_exempt
 def forgot_password(request):
     """
     POST /api/v1/auth/password/forgot
@@ -248,8 +197,6 @@ def forgot_password(request):
         "retry_after": wait
     }, status=200)
 
-
-@csrf_exempt
 def reset_password(request):
     """
     POST /api/v1/auth/password/reset
@@ -305,9 +252,47 @@ def reset_password(request):
         "message": "Contraseña actualizada exitosamente. Ya puedes iniciar sesión."
     }, status=200)
 
-
 def _getUser(email):
     try:
         return User.objects.get(user_email=email, user_active=True, user_delete=False)
     except User.DoesNotExist:
         return None
+
+@require_permission(endpoint="me", action="view")
+def me(request):
+    """
+    GET /api/v1/auth/me
+    Devuelve los datos y permisos del usuario autenticado a partir del JWT.
+    """
+    if request.method != "GET":
+        return JsonResponse({"detail": "Método no permitido.", "success": False}, status=405)
+
+    # ejecutar peticion a permisos para renderizar menu
+    profile = request.user.get("profile_id")
+
+    menu = queryDB("""
+        select
+            *
+        from profile_action pa 
+        inner join profile pr
+            on pr.profile_id = pa.profile_id
+            and pr.profile_active = true
+            and pr.profile_delete = false
+        where 
+            pa.profile_id = %s
+            and pa.profile_action_active = true
+            and pa.profile_action_delete = false
+    """, [profile])
+
+    if not menu:
+        return JsonResponse({
+            "success": False,
+            "message": "Usuario no encontrado o inactivo.",
+            "action": "closeSession"
+        }, status=401)
+
+    return JsonResponse({
+        "success": True,
+        "message": "Response OK",
+        "data": menu
+    }, status=200)
