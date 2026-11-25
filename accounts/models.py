@@ -8,7 +8,7 @@ NO está en el ERD: se agrega para SCRUM-15 (recuperación con PIN).
 from django.contrib.auth.hashers import check_password, make_password
 from django.db import models
 
-
+ 
 class Profile(models.Model):
     """Perfil/rol: ADMIN | MEMBER | AUTHOR."""
 
