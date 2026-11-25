@@ -8,11 +8,13 @@
 """
 import logging
 import os
+import json
 
 from django.conf import settings
 
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
+from urllib.error import URLError
 
 RECAPTCHA_VERIFY_URL = 'https://www.google.com/recaptcha/api/siteverify'
 

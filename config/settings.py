@@ -87,7 +87,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'uploads',
     'accounts',
-    'auth_api',
+    # 'auth_api',
     'article',
     'notifications',
 ]
