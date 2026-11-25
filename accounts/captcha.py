@@ -11,7 +11,30 @@ import os
 
 from django.conf import settings
 
-from auth_api.views import _verify_captcha
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
+
+RECAPTCHA_VERIFY_URL = 'https://www.google.com/recaptcha/api/siteverify'
+
+def _verify_captcha(token, remote_ip):
+    secret_key = os.getenv('RECAPTCHA_SECRET_KEY')
+    values = {'secret': secret_key, 'response': token}
+    if remote_ip:
+        values['remoteip'] = remote_ip
+
+    try:
+        request = Request(
+            RECAPTCHA_VERIFY_URL,
+            data=urlencode(values).encode(),
+            headers={'Content-Type': 'application/x-www-form-urlencoded'},
+            method='POST',
+        )
+        with urlopen(request, timeout=10) as response:
+            result = json.loads(response.read())
+        return result.get('success') is True
+    except (OSError, URLError, ValueError):
+        return False
+
 
 logger = logging.getLogger(__name__)
 
