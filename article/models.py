@@ -129,6 +129,7 @@ class Article(models.Model):
             "article_attached_url": generate_download_url(latest_attachment.article_attached_url) if latest_attachment else None,
             "article_attached_version": latest_attachment.article_attached_version if latest_attachment else None,
             "attachments": [att.to_dict() for att in attachments_qs],
+            "authors": [author.to_dict() for author in self.authors.all()],
         }
 
 
@@ -184,6 +185,60 @@ class ArticleAttached(models.Model):
             "article_attached_created_at": self.article_attached_created_at.isoformat() if self.article_attached_created_at else None,
             "article_attached_updated_by": self.article_attached_updated_by_id,
             "article_attached_updated_at": self.article_attached_updated_at.isoformat() if self.article_attached_updated_at else None,
+        }
+
+
+class ArticleAuthor(models.Model):
+    """Autores de un artículo: el autor de correspondencia (quien postula) y sus coautores.
+
+    Elicitación ítem 7 R1: de todos los autores se registra nombre, afiliación y correo;
+    los coautores no necesitan cuenta en el sistema. Decisión del equipo: solo el autor
+    de correspondencia ve el artículo y recibe las notificaciones.
+
+    La tabla ya existe en Supabase (creada el 23-nov); los nombres de columna son los de esa tabla.
+    """
+    article_author_id = models.AutoField(primary_key=True)
+    article = models.ForeignKey(
+        Article,
+        on_delete=models.CASCADE,
+        db_column="article_id",
+        related_name="authors",
+    )
+    # Solo el autor de correspondencia queda enlazado a su usuario; los coautores no tienen cuenta.
+    user = models.ForeignKey(
+        "accounts.User",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        db_column="user_id",
+        related_name="+",
+    )
+    author_name = models.CharField(max_length=60)
+    author_lastname = models.CharField(max_length=60, blank=True, default="")
+    author_email = models.CharField(max_length=120)
+    author_affiliation = models.CharField(max_length=200, blank=True, default="")
+    author_is_corresponding = models.BooleanField(default=False)
+    author_order = models.SmallIntegerField(default=0)
+    author_created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "article_author"
+        ordering = ["author_order", "article_author_id"]
+
+    def __str__(self):
+        return f"{self.author_name} {self.author_lastname} (Article {self.article_id})".strip()
+
+    def to_dict(self):
+        return {
+            "article_author_id": self.article_author_id,
+            "user_id": self.user_id,
+            "name": self.author_name,
+            "lastname": self.author_lastname,
+            "full_name": f"{self.author_name} {self.author_lastname}".strip(),
+            "affiliation": self.author_affiliation,
+            "email": self.author_email,
+            "is_corresponding": self.author_is_corresponding,
+            "order": self.author_order,
         }
 
 

@@ -1,4 +1,7 @@
 import json
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
+from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -9,12 +12,12 @@ from rest_framework.views import APIView
 
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
-from accounts.models import Profile
+from accounts.models import Profile, User
 from util.auth_service import require_permission, require_permission_drf
 from util.uploads.uploads import delete_file
 from util.utilDB import queryDB
 
-from .models import Article, ArticleAttached, ArticleReviewer, Event, Topic
+from .models import Article, ArticleAttached, ArticleAuthor, ArticleReviewer, Event, Topic
 from .serializers import (
     ArticleReorderSerializer,
     EventDetailSerializer,
@@ -30,6 +33,78 @@ def _parse_body(request):
         return json.loads(request.body.decode("utf-8"))
     except Exception:
         return {}
+
+
+MAX_COAUTHORS = 10
+
+
+def _validate_coauthors(raw, main_email):
+    """Valida la lista de coautores (nombre, afiliación y correo obligatorios; apellido opcional).
+
+    Devuelve (lista_limpia, None) o (None, mensaje_de_error).
+    """
+    if raw in (None, ""):
+        return [], None
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except ValueError:
+            return None, "El campo 'coauthors' debe ser una lista."
+    if not isinstance(raw, list):
+        return None, "El campo 'coauthors' debe ser una lista."
+    if len(raw) > MAX_COAUTHORS:
+        return None, f"Un artículo puede tener máximo {MAX_COAUTHORS} coautores."
+
+    seen = {main_email.lower()} if main_email else set()
+    clean = []
+    for index, item in enumerate(raw, start=1):
+        if not isinstance(item, dict):
+            return None, f"Coautor {index}: formato inválido."
+        name = str(item.get("name") or "").strip()
+        lastname = str(item.get("lastname") or "").strip()
+        affiliation = str(item.get("affiliation") or "").strip()
+        email = str(item.get("email") or "").strip().lower()
+        if not name or not affiliation or not email:
+            return None, f"Coautor {index}: nombre, afiliación y correo son obligatorios."
+        if len(name) > 60 or len(lastname) > 60 or len(affiliation) > 200 or len(email) > 120:
+            return None, f"Coautor {index}: algún campo supera el largo permitido."
+        try:
+            validate_email(email)
+        except ValidationError:
+            return None, f"Coautor {index}: el correo no es válido."
+        if email in seen:
+            return None, f"Coautor {index}: el correo {email} está repetido o es el del autor principal."
+        seen.add(email)
+        clean.append({"name": name, "lastname": lastname, "affiliation": affiliation, "email": email})
+    return clean, None
+
+
+def _save_authors(article, main_user, main_affiliation, coauthors):
+    """Reemplaza los autores del artículo: autor de correspondencia (orden 0) + coautores."""
+    article.authors.all().delete()
+    rows = []
+    if main_user:
+        rows.append(ArticleAuthor(
+            article=article,
+            user=main_user,
+            author_name=(main_user.user_name or main_user.user_email)[:60],
+            author_lastname=(main_user.user_lastname or "")[:60],
+            author_affiliation=main_affiliation,
+            author_email=(main_user.user_email or "").lower(),
+            author_is_corresponding=True,
+            author_order=0,
+        ))
+    for order, coauthor in enumerate(coauthors, start=1):
+        rows.append(ArticleAuthor(
+            article=article,
+            author_name=coauthor["name"],
+            author_lastname=coauthor["lastname"],
+            author_affiliation=coauthor["affiliation"],
+            author_email=coauthor["email"],
+            author_is_corresponding=False,
+            author_order=order,
+        ))
+    ArticleAuthor.objects.bulk_create(rows)
 
 
 def list_topics(request):
@@ -129,7 +204,7 @@ def list_articles(request):
     base = (
         Article.objects
         .select_related("topic_id", "article_created_by")
-        .prefetch_related("attachments")
+        .prefetch_related("attachments", "authors")
     )
     match profile_name:
         case "ADMIN":
@@ -194,23 +269,40 @@ def create_article(request):
         )
 
     created_by_id = request.user.get("user_id")
+    main_user = User.objects.filter(pk=created_by_id).first()
 
-    article = Article.objects.create(
-        article_subject=subject,
-        article_description=data.get("article_description", data.get("summary", "")),
-        topic_id_id=data.get("topic_id"),
-        article=content,
-        article_date=data.get("article_date") or data.get("published_at"),
-        article_created_by_id=created_by_id,
-    )
-
-    attached_url = data.get("article_attached_url")
-    if attached_url:
-        ArticleAttached.objects.create(
-            article=article,
-            article_attached_url=attached_url,
-            article_attached_created_by_id=created_by_id,
+    # Autores: quien postula es el autor principal; los coautores llegan en 'coauthors'
+    main_affiliation = str(data.get("main_author_affiliation") or "").strip()
+    if not main_affiliation:
+        return JsonResponse(
+            {"detail": "La afiliación del autor principal ('main_author_affiliation') es obligatoria."},
+            status=400,
         )
+    coauthors, error = _validate_coauthors(
+        data.get("coauthors"), main_user.user_email if main_user else None
+    )
+    if error:
+        return JsonResponse({"detail": error}, status=400)
+
+    with transaction.atomic():
+        article = Article.objects.create(
+            article_subject=subject,
+            article_description=data.get("article_description", data.get("summary", "")),
+            topic_id_id=data.get("topic_id"),
+            article=content,
+            article_date=data.get("article_date") or data.get("published_at"),
+            article_created_by_id=created_by_id,
+        )
+
+        attached_url = data.get("article_attached_url")
+        if attached_url:
+            ArticleAttached.objects.create(
+                article=article,
+                article_attached_url=attached_url,
+                article_attached_created_by_id=created_by_id,
+            )
+
+        _save_authors(article, main_user, main_affiliation, coauthors)
 
     return JsonResponse({
         "success": True,
@@ -234,6 +326,38 @@ def update_article(request, article_id):
     data = _parse_body(request)
     if not data and request.POST:
         data = request.POST.dict()
+
+    # Autores: el principal siempre es quien postuló (article_created_by), no quien edita
+    authors_to_save = None
+    if "coauthors" in data or "main_author_affiliation" in data:
+        main_user = article.article_created_by
+        current_main = article.authors.filter(author_is_corresponding=True).first()
+        if "main_author_affiliation" in data:
+            main_affiliation = str(data.get("main_author_affiliation") or "").strip()
+        else:
+            main_affiliation = current_main.author_affiliation if current_main else ""
+        if not main_affiliation:
+            return JsonResponse(
+                {"detail": "La afiliación del autor principal ('main_author_affiliation') es obligatoria."},
+                status=400,
+            )
+        if "coauthors" in data:
+            coauthors, error = _validate_coauthors(
+                data.get("coauthors"), main_user.user_email if main_user else None
+            )
+            if error:
+                return JsonResponse({"detail": error}, status=400)
+        else:
+            coauthors = [
+                {
+                    "name": a.author_name,
+                    "lastname": a.author_lastname,
+                    "affiliation": a.author_affiliation,
+                    "email": a.author_email,
+                }
+                for a in article.authors.filter(author_is_corresponding=False)
+            ]
+        authors_to_save = (main_user, main_affiliation, coauthors)
 
     if "article_subject" in data:
         article.article_subject = data["article_subject"]
@@ -287,7 +411,10 @@ def update_article(request, article_id):
                 article_attached_created_by_id=updated_by_id,
             )
 
-    article.save()
+    with transaction.atomic():
+        article.save()
+        if authors_to_save:
+            _save_authors(article, *authors_to_save)
     return JsonResponse({
         "success": True,
         "message": "Artículo actualizado con éxito.",

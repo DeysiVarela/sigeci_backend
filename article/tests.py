@@ -3,6 +3,7 @@ from django.test import TestCase, Client, override_settings
 from django.urls import reverse
 from datetime import date, time
 from rest_framework.test import APITestCase
+from django.core.cache import cache
 from django.core.management import call_command
 from accounts.models import Profile, User
 from .models import Article, ArticleAttached, ArticleReviewer, Event, Schedule, Topic
@@ -11,6 +12,7 @@ from .models import Article, ArticleAttached, ArticleReviewer, Event, Schedule, 
 @override_settings(CAPTCHA_REQUIRED=False)
 class ArticleCrudTests(TestCase):
     def setUp(self):
+        cache.clear()  # el login tiene límite de 10/min (throttle 'auth'); se reinicia por test
         self.client = Client()
         call_command("seed_accounts")
         self.topic = Topic.objects.create(topic_subject="Inteligencia Artificial")
@@ -63,6 +65,10 @@ class ArticleCrudTests(TestCase):
             "topic_id": self.topic.topic_id,
             "article": "Cuerpo del documento técnico.",
             "article_date": "2026-04-01",
+            "main_author_affiliation": "Universidad del Valle",
+            "coauthors": [
+                {"name": "Ana", "lastname": "Pérez", "affiliation": "Universidad Nacional", "email": "Ana.Perez@test.local"},
+            ],
         }
         response = self.client.post(
             "/api/v1/article/create/",
@@ -74,6 +80,63 @@ class ArticleCrudTests(TestCase):
         data = response.json()
         self.assertEqual(data["data"]["article_subject"], "Seguridad Informática")
         self.assertTrue(Article.objects.filter(article_subject="Seguridad Informática").exists())
+        authors = data["data"]["authors"]
+        self.assertEqual(len(authors), 2)
+        self.assertTrue(authors[0]["is_corresponding"])
+        self.assertEqual(authors[0]["email"], self.admin.user_email)
+        self.assertEqual(authors[0]["affiliation"], "Universidad del Valle")
+        self.assertFalse(authors[1]["is_corresponding"])
+        self.assertEqual(authors[1]["email"], "ana.perez@test.local")
+
+    def _create_payload(self, **extra):
+        payload = {
+            "article_subject": "Artículo con autores",
+            "topic_id": self.topic.topic_id,
+            "article": "Contenido.",
+            "main_author_affiliation": "Universidad del Valle",
+        }
+        payload.update(extra)
+        return payload
+
+    def _post_create(self, payload):
+        return self.client.post(
+            "/api/v1/article/create/",
+            data=json.dumps(payload),
+            content_type="application/json",
+            **self.auth_headers,
+        )
+
+    def test_create_article_validates_authors(self):
+        invalid_cases = {
+            "sin afiliación del autor principal": self._create_payload(main_author_affiliation=""),
+            "coautor sin correo": self._create_payload(coauthors=[{"name": "Ana", "affiliation": "UV"}]),
+            "correo repetido": self._create_payload(coauthors=[
+                {"name": "Ana", "affiliation": "UV", "email": "ana@test.local"},
+                {"name": "Ana Bis", "affiliation": "UN", "email": "ANA@test.local"},
+            ]),
+            "autor principal como coautor": self._create_payload(coauthors=[
+                {"name": "Yo mismo", "affiliation": "UV", "email": self.admin.user_email},
+            ]),
+        }
+        for case, payload in invalid_cases.items():
+            with self.subTest(case=case):
+                self.assertEqual(self._post_create(payload).status_code, 400)
+        self.assertFalse(Article.objects.filter(article_subject="Artículo con autores").exists())
+
+    def test_update_article_replaces_coauthors_and_keeps_main_author(self):
+        created = self._post_create(self._create_payload(
+            coauthors=[{"name": "Ana", "affiliation": "UV", "email": "ana@test.local"}]
+        )).json()["data"]
+        response = self.client.put(
+            f"/api/v1/article/{created['article_id']}/update/",
+            data=json.dumps({"coauthors": [{"name": "Luis", "affiliation": "UN", "email": "luis@test.local"}]}),
+            content_type="application/json",
+            **self.auth_headers,
+        )
+        self.assertEqual(response.status_code, 200)
+        authors = response.json()["data"]["authors"]
+        self.assertEqual([a["email"] for a in authors], [self.admin.user_email, "luis@test.local"])
+        self.assertEqual(authors[0]["affiliation"], "Universidad del Valle")
 
     def test_update_article_via_method_url(self):
         payload = {
@@ -317,6 +380,7 @@ class EvaluationAssignmentTests(APITestCase):
         return user
 
     def authenticate(self, user):
+        cache.clear()  # el login tiene límite de 10/min (throttle 'auth'); se reinicia por test
         response = self.client.post(
             "/api/auth/login/",
             {"email": user.user_email, "password": "Clave.Segura1"},
