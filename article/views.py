@@ -114,7 +114,6 @@ def event_detail(request, event_id):
         "data": EventDetailSerializer(event).data,
     }, status=status.HTTP_200_OK)
 
-
 @require_permission(endpoint="article", action="view")
 def list_articles(request):
     try:
@@ -124,41 +123,28 @@ def list_articles(request):
     profile_name = Profile.objects.filter(profile_id=profile_id).values_list(
         "profile_name", flat=True
     ).first()
-    user = request.user.get("user_id")
-    articles = []
+    user_id = request.user.get("user_id")
+
+    # Se usa el ORM + to_dict() para incluir nombre del autor y última versión del PDF
+    base = (
+        Article.objects
+        .select_related("topic_id", "article_created_by")
+        .prefetch_related("attachments")
+    )
     match profile_name:
         case "ADMIN":
-            articles = queryDB("""
-                select 
-                    ar.*,
-                    tp.topic_subject
-                from article ar
-                inner join topic tp
-                    on tp.topic_id = ar.topic_id
-            """, None)
-
+            articles = base.all()
         case "MEMBER":
-            articles = (
-                Article.objects
-                .select_related("topic_id", "article_created_by")
-                .prefetch_related("attachments")
-                .filter(article_active=True)
-            )
+            articles = base.filter(article_active=True)
         case "AUTHOR":
-            articles = queryDB("""
-                select 
-                    ar.*,
-                    tp.topic_subject
-                from article ar
-                inner join topic tp
-                    on tp.topic_id = ar.topic_id
-                where ar.article_created_by = %s
-            """, [user])
+            articles = base.filter(article_created_by_id=user_id)
+        case _:
+            articles = Article.objects.none()
 
     return JsonResponse({
         "success": True,
         "message": "Artículos obtenidos con éxito.",
-        "data": articles
+        "data": [a.to_dict() for a in articles]
     }, safe=False, status=200)
 
 
