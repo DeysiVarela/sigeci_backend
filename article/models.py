@@ -11,7 +11,7 @@ class Topic(models.Model):
 
     # Campos de auditoría
     topic_created_by = models.ForeignKey(
-        "accounts.User",
+        "users.User",
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
@@ -20,7 +20,7 @@ class Topic(models.Model):
     )
     topic_created_at = models.DateTimeField(auto_now_add=True)
     topic_updated_by = models.ForeignKey(
-        "accounts.User",
+        "users.User",
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
@@ -67,7 +67,7 @@ class Article(models.Model):
 
     # Campos de auditoría
     article_created_by = models.ForeignKey(
-        "accounts.User",
+        "users.User",
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
@@ -76,7 +76,7 @@ class Article(models.Model):
     )
     article_created_at = models.DateTimeField(auto_now_add=True)
     article_updated_by = models.ForeignKey(
-        "accounts.User",
+        "users.User",
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
@@ -141,7 +141,7 @@ class ArticleAttached(models.Model):
 
     # Campos de auditoría
     article_attached_created_by = models.ForeignKey(
-        "accounts.User",
+        "users.User",
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
@@ -150,7 +150,7 @@ class ArticleAttached(models.Model):
     )
     article_attached_created_at = models.DateTimeField(auto_now_add=True)
     article_attached_updated_by = models.ForeignKey(
-        "accounts.User",
+        "users.User",
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
@@ -207,7 +207,7 @@ class ArticleReviewer(models.Model):
         related_name="reviews"
     )
     user = models.ForeignKey(
-        "accounts.User",
+        "users.User",
         on_delete=models.CASCADE,
         db_column="user_id",
         related_name="article_assignments"
@@ -219,7 +219,7 @@ class ArticleReviewer(models.Model):
 
     # Campos de auditoría
     article_reviewer_created_by = models.ForeignKey(
-        "accounts.User",
+        "users.User",
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
@@ -228,7 +228,7 @@ class ArticleReviewer(models.Model):
     )
     article_reviewer_created_at = models.DateTimeField(auto_now_add=True)
     article_reviewer_updated_by = models.ForeignKey(
-        "accounts.User",
+        "users.User",
         null=True,
         blank=True,
         on_delete=models.SET_NULL,

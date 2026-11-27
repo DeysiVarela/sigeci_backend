@@ -86,7 +86,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'uploads',
-    'accounts',
+    'users',
     'auth_api',
     'notifications',
     'Login',
@@ -193,8 +193,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # API (DRF + JWT) - SCRUM-15 / SCRUM-16
 # ---------------------------------------------------------------------------
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': ['accounts.authentication.SigeciJWTAuthentication'],
-    'DEFAULT_PERMISSION_CLASSES': ['rest_framework.permissions.IsAuthenticated'],
+    'DEFAULT_AUTHENTICATION_CLASSES': [],
+    'DEFAULT_PERMISSION_CLASSES': ['rest_framework.permissions.AllowAny'],
     'DEFAULT_THROTTLE_RATES': {
         'auth': '10/min',            # login y refresh
         'password_reset': '5/min',   # solicitar PIN / restablecer
@@ -202,8 +202,8 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'USER_ID_FIELD': 'user_id',
     'USER_ID_CLAIM': 'user_id',
     'AUTH_HEADER_TYPES': ('Bearer',),

@@ -6,7 +6,9 @@ from functools import wraps
 from util.enum.Codes import Codes
 from django.db import connection
 from django.http import JsonResponse
+from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.permissions import AllowAny
 
 logger = logging.getLogger(__name__)
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY")
@@ -53,10 +55,7 @@ def check_permission(user_id, endpoint, action):
             [user_id, endpoint]
         )
         row = cursor.fetchone()
-        # print("row", row)
         permissions = row[0].split("|")
-        # print("permissions", permissions)
-        # create|view|update
         if action in permissions:
             return True
         return False
@@ -148,3 +147,8 @@ def require_permission_drf(endpoint: str, action: str):
             return func(self, request, *args, **kwargs)
         return wrapper
     return decorator
+
+
+class SigeciAPIView(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]

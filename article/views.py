@@ -3,9 +3,9 @@ from django.http import JsonResponse
 from django.utils import timezone
 from django.db import connection
 from util.utilDB import queryDB
-from django.views.decorators.csrf import csrf_exempt
 from util.auth_service import require_permission
-from util.uploads.uploads import delete_file
+from django.views.decorators.csrf import csrf_exempt
+from util.uploads.uploads import delete_file, generate_download_url
 
 from .models import Article, ArticleAttached, Topic
 
@@ -46,12 +46,21 @@ def list_articles(request):
                     on tp.topic_id = ar.topic_id
             """, None)
         case "2": # reviewer
-            articles = (
-                Article.objects
-                .select_related("topic_id", "article_created_by")
-                .prefetch_related("attachments")
-                .filter(article_active=True)
-            )
+            articles = queryDB("""
+                select distinct
+                    ar.*,
+                    tp.topic_subject
+                from article ar
+                inner join topic tp
+                    on tp.topic_id = ar.topic_id
+                inner join article_reviewer rv
+                    on rv.article_id = ar.article_id
+                    and rv.user_id = %s
+                    and rv.article_reviewer_active = true
+                    and rv.article_reviewer_delete = false
+                where ar.article_active = true
+                  and ar.article_delete = false
+            """, [user])
         case "3": # author
             articles = queryDB("""
                 select 
@@ -80,20 +89,94 @@ def detail_article(request, article_id):
     if request.method != "GET":
         return JsonResponse({"detail": "Método no permitido.", "success": False}, status=405)
 
-    try:
-        article = (
-            Article.objects
-            .select_related("topic_id", "article_created_by")
-            .prefetch_related("attachments")
-            .get(pk=article_id)
-        )
-        return JsonResponse({
-            "success": True,
-            "message": "Artículo obtenido con éxito.",
-            "data": article.to_dict()
-        }, status=200)
-    except Article.DoesNotExist:
+    profile = str(request.user.get("profile_id"))
+    user = request.user.get("user_id")
+    rows = []
+
+    match profile:
+        case "1": # admin
+            rows = queryDB("""
+                select
+                    ar.*,
+                    tp.topic_subject,
+                    tp.topic_subject as topic_name,
+                    trim(coalesce(u.user_name, '') || ' ' || coalesce(u.user_lastname, '')) as article_created_by_name
+                from article ar
+                inner join topic tp
+                    on tp.topic_id = ar.topic_id
+                left join users u
+                    on u.user_id = ar.article_created_by
+                where ar.article_id = %s
+                limit 1
+            """, [article_id])
+        case "2": # reviewer
+            rows = queryDB("""
+                select distinct
+                    ar.*,
+                    tp.topic_subject,
+                    tp.topic_subject as topic_name,
+                    trim(coalesce(u.user_name, '') || ' ' || coalesce(u.user_lastname, '')) as article_created_by_name
+                from article ar
+                inner join topic tp
+                    on tp.topic_id = ar.topic_id
+                inner join article_reviewer rv
+                    on rv.article_id = ar.article_id
+                    and rv.user_id = %s
+                    and rv.article_reviewer_active = true
+                    and rv.article_reviewer_delete = false
+                left join users u
+                    on u.user_id = ar.article_created_by
+                where ar.article_id = %s
+                  and ar.article_active = true
+                  and ar.article_delete = false
+                limit 1
+            """, [user, article_id])
+        case "3": # author
+            rows = queryDB("""
+                select
+                    ar.*,
+                    tp.topic_subject,
+                    tp.topic_subject as topic_name,
+                    trim(coalesce(u.user_name, '') || ' ' || coalesce(u.user_lastname, '')) as article_created_by_name
+                from article ar
+                inner join topic tp
+                    on tp.topic_id = ar.topic_id
+                left join users u
+                    on u.user_id = ar.article_created_by
+                where ar.article_id = %s
+                  and ar.article_created_by = %s
+                limit 1
+            """, [article_id, user])
+        case _:
+            return JsonResponse({"detail": "No tienes permisos para ver este artículo.", "success": False}, status=403)
+
+    if not rows:
         return JsonResponse({"detail": "Artículo no encontrado.", "success": False}, status=404)
+
+    article = rows[0]
+    attachments = queryDB("""
+        select *
+        from article_attached
+        where article_id = %s
+          and article_attached_active = true
+          and article_attached_delete = false
+        order by article_attached_id desc
+    """, [article_id])
+
+    for att in attachments:
+        if att.get("article_attached_url"):
+            att["article_attached_url"] = generate_download_url(att["article_attached_url"])
+
+    latest_attachment = attachments[0] if attachments else None
+    article["article_attached_url"] = latest_attachment["article_attached_url"] if latest_attachment else None
+    article["article_attached_version"] = latest_attachment["article_attached_version"] if latest_attachment else None
+    article["attachments"] = attachments
+
+    return JsonResponse({
+        "success": True,
+        "message": "Artículo obtenido con éxito.",
+        "data": article
+    }, status=200)
 
 
 @require_permission(endpoint="article", action="create")
@@ -141,7 +224,6 @@ def create_article(request):
     }, status=201)
 
 
-@csrf_exempt
 @require_permission(endpoint="article", action="update")
 def update_article(request, article_id):
     """Actualizar un artículo existente."""
@@ -217,7 +299,6 @@ def update_article(request, article_id):
     }, status=200)
 
 
-@csrf_exempt
 @require_permission(endpoint="article", action="delete")
 def delete_article(request, article_id):
     """Eliminar un artículo."""

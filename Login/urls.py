@@ -1,6 +1,7 @@
 from django.urls import re_path
 from .views import (
     login,
+    register,
     me,
     refresh_token,
     forgot_password,
@@ -9,6 +10,7 @@ from .views import (
 
 urlpatterns = [
     re_path(r"^auth/login/?$", login, name="login_v1"),
+    re_path(r"^auth/register/?$", register, name="register_v1"),
     re_path(r"^auth/me/?$", me, name="me_v1"),
     re_path(r"^auth/refresh/?$", refresh_token, name="refresh_v1"),
     re_path(r"^auth/refresh-token/?$", refresh_token, name="refresh_token_v1"),

@@ -1,38 +1,40 @@
+import hashlib
 import json
 import logging
 import math
 import secrets
 import time
+import uuid
 from datetime import timedelta
-from util.auth_service import require_permission
-from util.utilDB import queryDB
-
-from util.enum.Codes import Codes
 
 from django.conf import settings
 from django.core.cache import cache
 from django.contrib.auth.hashers import check_password, make_password
-from django.db import transaction
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import IntegrityError, transaction
 from django.http import JsonResponse
 from django.utils import timezone
-from django.views.decorators.csrf import csrf_exempt
+from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from accounts.models import PasswordResetPin, User
-from accounts.users.serializers import UserSerializer
-from accounts.views import (
-    INVALID_CREDENTIALS,
-    INVALID_PIN,
-    FORGOT_GENERIC,
-    _eligible_user,
-    _resend_key,
-    _user_payload,
-)
 from notifications.services import PinEmailError, send_recovery_pin_email
+from users.models import PasswordResetPin, Profile, User
+from users.serializers import UserSerializer
+from users.validators import validate_strong_password
+from util.auth_service import require_permission
 from util.captcha_service import require_captcha
+from util.enum.Codes import Codes
+from util.utilDB import queryDB
 
 logger = logging.getLogger(__name__)
+
+AUTHOR_PROFILE = "AUTHOR"
+INVALID_CREDENTIALS = {"detail": "Credenciales inválidas."}
+INVALID_PIN = {"detail": "PIN inválido, vencido o ya utilizado."}
+FORGOT_GENERIC = {
+    "detail": "Si el correo corresponde a una cuenta activa, recibirás un PIN para restablecer tu contraseña."
+}
 
 
 def _parse_body(request):
@@ -42,18 +44,48 @@ def _parse_body(request):
         return {}
 
 
-@csrf_exempt
+def _user_payload(user):
+    data = UserSerializer(user).data
+    data["permissions"] = user.permissions_map()
+    return data
+
+
+def _resend_key(email):
+    return "pin_resend:" + hashlib.sha256(email.strip().lower().encode()).hexdigest()
+
+
+def _eligible_user(email):
+    return (
+        User.objects.prefetch_related("profiles")
+        .filter(
+            user_email__iexact=email.strip(),
+            user_active=True,
+            user_delete=False,
+            user_provider=User.PROVIDER_ACCOUNT,
+        )
+        .first()
+    )
+
+
+def _getUser(email):
+    try:
+        return User.objects.prefetch_related("profiles").get(
+            user_email__iexact=email, user_active=True, user_delete=False
+        )
+    except User.DoesNotExist:
+        return None
+
 @require_captcha
 def login(request):
     """
     POST /api/v1/auth/login
-    Valida credenciales, genera JWT (access + refresh) y retorna datos del usuario.
+    Valida credenciales, genera JWT (token + refresh_token) y retorna datos del usuario.
     El captchaToken ya es validado previamente por @require_captcha.
     """
     if request.method != "POST":
-        return JsonResponse({"detail": "Method not allowed", "success": False}, status=405)
+        return JsonResponse({"message": "Método no permitido.", "success": False}, status=405)
 
-    data        = json.loads(request.body.decode('utf-8'))
+    data        = _parse_body(request)
     email       = data.get("email").strip()
     password    = data.get("password")
 
@@ -61,7 +93,6 @@ def login(request):
         return JsonResponse({
             "success": False,
             "message": "Correo y contraseña son obligatorios.",
-            "detail": "Credenciales incompletas."
         }, status=400)
 
     user = _getUser(email)
@@ -69,14 +100,15 @@ def login(request):
         return JsonResponse({
             "success": False,
             "message": "Credenciales inválidas.",
-            "detail": INVALID_CREDENTIALS["detail"]
         }, status=400)
 
-    # Generamos tokens JWT
-    refresh         = RefreshToken.for_user(user)
+    if not user.user_seed_token:
+        user.user_seed_token = str(uuid.uuid4())
+        user.save(update_fields=["user_seed_token"])
 
-    refresh["user_id"]          = user.user_id
-    refresh["user_seed_token"]  = user.user_seed_token
+    refresh = RefreshToken.for_user(user)
+    refresh["user_id"] = user.user_id
+    refresh["user_seed_token"] = user.user_seed_token
 
     access_token    = str(refresh.access_token)
     refresh_token   = str(refresh)
@@ -93,7 +125,81 @@ def login(request):
     }, status=200)
 
 
-@csrf_exempt
+@require_captcha
+def register(request):
+    """
+    POST /api/v1/auth/register
+    Registro público de usuarios con rol AUTHOR.
+    """
+    if request.method != "POST":
+        return JsonResponse({"message": "Método no permitido.", "success": False}, status=405)
+
+    data = _parse_body(request)
+    name = (data.get("name") or "").strip()
+    lastname = (data.get("lastname") or "").strip()
+    email = (data.get("email") or "").strip().lower()
+    password = data.get("password") or ""
+
+    if not name or not lastname or not email or not password:
+        return JsonResponse({
+            "success": False,
+            "message": "Todos los campos son obligatorios.",
+        }, status=400)
+
+    try:
+        validate_strong_password(password)
+    except (DjangoValidationError, DRFValidationError) as exc:
+        detail = getattr(exc, "detail", None)
+        if isinstance(detail, list) and detail:
+            msg = str(detail[0])
+        elif getattr(exc, "messages", None):
+            msg = exc.messages[0]
+        else:
+            msg = str(exc)
+        return JsonResponse({"success": False, "message": msg}, status=400)
+
+    author = Profile.objects.filter(
+        profile_name=AUTHOR_PROFILE, profile_active=True, profile_delete=False
+    ).first()
+    if author is None:
+        logger.error("Registro público: no existe el perfil AUTHOR.")
+        return JsonResponse({
+            "success": False,
+            "message": "El registro no está disponible en este momento.",
+        }, status=503)
+
+    if User.objects.filter(user_email__iexact=email).exists():
+        return JsonResponse({
+            "success": False,
+            "message": "Ya existe una cuenta registrada con este correo.",
+        }, status=409)
+
+    user = User(
+        user_name=name,
+        user_lastname=lastname,
+        user_email=email,
+        user_provider=User.PROVIDER_ACCOUNT,
+        user_seed_token=str(uuid.uuid4()),
+    )
+    user.set_password(password)
+
+    try:
+        with transaction.atomic():
+            user.save()
+            user.profiles.add(author)
+    except IntegrityError:
+        return JsonResponse({
+            "success": False,
+            "message": "Ya existe una cuenta registrada con este correo.",
+        }, status=409)
+
+    return JsonResponse({
+        "success": True,
+        "message": "Cuenta creada exitosamente. Ya puedes iniciar sesión.",
+        "data": UserSerializer(user).data,
+    }, status=201)
+
+
 @require_permission(endpoint="me", action="view")
 def me(request):
     """
@@ -101,7 +207,7 @@ def me(request):
     Devuelve los datos y permisos del usuario autenticado a partir del JWT.
     """
     if request.method != "GET":
-        return JsonResponse({"detail": "Método no permitido.", "success": False}, status=405)
+        return JsonResponse({"message": "Método no permitido.", "success": False}, status=405)
 
     # ejecutar peticion a permisos para renderizar menu
     profile = request.user.get("profile_id")
@@ -109,12 +215,12 @@ def me(request):
     menu = queryDB("""
         select
             *
-        from profile_action pa 
+        from profile_action pa
         inner join profile pr
             on pr.profile_id = pa.profile_id
             and pr.profile_active = true
             and pr.profile_delete = false
-        where 
+        where
             pa.profile_id = %s
             and pa.profile_action_active = true
             and pa.profile_action_delete = false
@@ -134,25 +240,22 @@ def me(request):
     }, status=200)
 
 
-@csrf_exempt
 def refresh_token(request):
     """
     POST /api/v1/auth/refresh o /api/v1/auth/refresh-token
     Renueva el access token a partir del refresh token.
-    Compatible tanto con { refresh: "..." } como con { refresh_token: "..." }.
     """
     if request.method != "POST":
-        return JsonResponse({"detail": "Método no permitido.", "success": False}, status=405)
+        return JsonResponse({"message": "Método no permitido.", "success": False}, status=405)
 
     data = _parse_body(request)
-    token_str = data.get("refresh_token") or data.get("refresh")
+    token_str = data.get("refresh_token")
 
     if not token_str:
         return JsonResponse({
             "success": False,
             "message": Codes.UNAUTHORIZED.value,
             "internMessage": "El token de refresco es obligatorio.",
-            "detail": "Missing refresh token."
         }, status=400)
 
     try:
@@ -172,6 +275,8 @@ def refresh_token(request):
             "action": "closeSession"
         }, status=401)
 
+    refresh["user_id"] = user.user_id
+    refresh["user_seed_token"] = user.user_seed_token
     new_access = str(refresh.access_token)
 
     return JsonResponse({
@@ -179,21 +284,18 @@ def refresh_token(request):
         "message": "Token renovado exitosamente.",
         "data": {
             "token": new_access,
-            "access": new_access,
             "refresh_token": str(refresh),
-            "refresh": str(refresh),
         }
     }, status=200)
 
 
-@csrf_exempt
 def forgot_password(request):
     """
     POST /api/v1/auth/password/forgot
     Envía PIN de recuperación por correo.
     """
     if request.method != "POST":
-        return JsonResponse({"detail": "Método no permitido.", "success": False}, status=405)
+        return JsonResponse({"message": "Método no permitido.", "success": False}, status=405)
 
     data = _parse_body(request)
     email = (data.get("email") or "").strip()
@@ -249,25 +351,36 @@ def forgot_password(request):
     }, status=200)
 
 
-@csrf_exempt
 def reset_password(request):
     """
     POST /api/v1/auth/password/reset
     Verifica el PIN y actualiza la contraseña del usuario.
     """
     if request.method != "POST":
-        return JsonResponse({"detail": "Método no permitido.", "success": False}, status=405)
+        return JsonResponse({"message": "Método no permitido.", "success": False}, status=405)
 
     data = _parse_body(request)
     email = (data.get("email") or "").strip()
     pin = (str(data.get("pin") or "")).strip()
-    password = data.get("password") or data.get("pass")
+    password = data.get("password")
 
     if not email or not pin or not password:
         return JsonResponse({
             "success": False,
             "message": "Correo, PIN y nueva contraseña son obligatorios."
         }, status=400)
+
+    try:
+        validate_strong_password(password)
+    except (DjangoValidationError, DRFValidationError) as exc:
+        detail = getattr(exc, "detail", None)
+        if isinstance(detail, list) and detail:
+            msg = str(detail[0])
+        elif getattr(exc, "messages", None):
+            msg = exc.messages[0]
+        else:
+            msg = str(exc)
+        return JsonResponse({"success": False, "message": msg}, status=400)
 
     user = _eligible_user(email)
     if user is None:
@@ -304,10 +417,3 @@ def reset_password(request):
         "success": True,
         "message": "Contraseña actualizada exitosamente. Ya puedes iniciar sesión."
     }, status=200)
-
-
-def _getUser(email):
-    try:
-        return User.objects.get(user_email=email, user_active=True, user_delete=False)
-    except User.DoesNotExist:
-        return None

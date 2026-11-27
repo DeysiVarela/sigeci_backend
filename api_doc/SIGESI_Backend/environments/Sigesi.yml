@@ -3,7 +3,7 @@ variables:
   - name: url
     value: http://localhost:8000/api/v1
   - name: token
-    value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzk1MzMzNTA1LCJpYXQiOjE3OTUzMzE3MDUsImp0aSI6ImUwYWEyZjAxNGFjOTQ0NWRiMmI5NzA5YTBmYWFjZjFlIiwidXNlcl9pZCI6OCwidXNlcl9zZWVkX3Rva2VuIjoiZmIwZjgxNzYtYjM3Yi00YTUzLWE0OWItOGMwZWRiZjUyYTMwIn0.S6Crakz66y0j2m3hyBUEFI4XOMcr3RI39BWLYicOLqY
+    value: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzk1NzYyMTYzLCJpYXQiOjE3OTU3NjEyNjMsImp0aSI6ImYyNmU1YjY1MTM0OTQ2NzBiYzVmMWY3MzY2ZjI0YzZjIiwidXNlcl9pZCI6OCwidXNlcl9zZWVkX3Rva2VuIjoiZmIwZjgxNzYtYjM3Yi00YTUzLWE0OWItOGMwZWRiZjUyYTMwIn0.AURn5ZYjpk8YwdRZFkJ8zlbaV9_YE2n4w84V48Wwisk
   - name: url
     value: https://sigeci-backend.onrender.com/api/v1
     disabled: true

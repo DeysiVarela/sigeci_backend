@@ -37,9 +37,9 @@ class Migration(migrations.Migration):
                 ('user_delete', models.BooleanField(default=False)),
                 ('user_created_at', models.DateTimeField(auto_now_add=True)),
                 ('user_updated_at', models.DateTimeField(auto_now=True)),
-                ('profile', models.ForeignKey(db_column='profile_id', on_delete=django.db.models.deletion.PROTECT, related_name='users', to='accounts.profile')),
-                ('user_created_by', models.ForeignKey(blank=True, db_column='user_created_by', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to='accounts.user')),
-                ('user_updated_by', models.ForeignKey(blank=True, db_column='user_updated_by', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to='accounts.user')),
+                ('profile', models.ForeignKey(db_column='profile_id', on_delete=django.db.models.deletion.PROTECT, related_name='users', to='users.profile')),
+                ('user_created_by', models.ForeignKey(blank=True, db_column='user_created_by', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to='users.user')),
+                ('user_updated_by', models.ForeignKey(blank=True, db_column='user_updated_by', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to='users.user')),
             ],
             options={
                 'db_table': 'users',
@@ -55,7 +55,7 @@ class Migration(migrations.Migration):
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('expires_at', models.DateTimeField()),
                 ('used_at', models.DateTimeField(blank=True, null=True)),
-                ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='reset_pins', to='accounts.user')),
+                ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='reset_pins', to='users.user')),
             ],
             options={
                 'db_table': 'password_reset_pin',
@@ -70,7 +70,7 @@ class Migration(migrations.Migration):
                 ('profile_action_permissions', models.CharField(max_length=60)),
                 ('profile_action_active', models.BooleanField(default=True)),
                 ('profile_action_delete', models.BooleanField(default=False)),
-                ('profile', models.ForeignKey(db_column='profile_id', on_delete=django.db.models.deletion.CASCADE, related_name='actions', to='accounts.profile')),
+                ('profile', models.ForeignKey(db_column='profile_id', on_delete=django.db.models.deletion.CASCADE, related_name='actions', to='users.profile')),
             ],
             options={
                 'db_table': 'profile_action',

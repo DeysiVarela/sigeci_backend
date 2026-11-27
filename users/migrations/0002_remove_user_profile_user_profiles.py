@@ -4,7 +4,7 @@ from django.db import migrations, models
 
 
 def copy_profile_to_profiles(apps, schema_editor):
-    User = apps.get_model('accounts', 'User')
+    User = apps.get_model('users', 'User')
     for user in User.objects.exclude(profile__isnull=True):
         user.profiles.add(user.profile_id)
 
@@ -12,7 +12,7 @@ def copy_profile_to_profiles(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('accounts', '0001_initial'),
+        ('users', '0001_initial'),
     ]
 
     operations = [
@@ -20,7 +20,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='user',
             name='profiles',
-            field=models.ManyToManyField(db_table='user_profiles', related_name='users_m2m', to='accounts.profile'),
+            field=models.ManyToManyField(db_table='user_profiles', related_name='users_m2m', to='users.profile'),
         ),
     
         migrations.RunPython(copy_profile_to_profiles, migrations.RunPython.noop),
@@ -32,6 +32,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='user',
             name='profiles',
-            field=models.ManyToManyField(db_table='user_profiles', related_name='users', to='accounts.profile'),
+            field=models.ManyToManyField(db_table='user_profiles', related_name='users', to='users.profile'),
         ),
     ]

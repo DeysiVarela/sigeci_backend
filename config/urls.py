@@ -13,14 +13,10 @@ def health(request):
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    # accounts va PRIMERO: /api/auth/login es el login real (usuarios en BD + JWT).
-    # El login de demostración de auth_api queda en la misma ruta, por lo que no se alcanza;
-    # de auth_api se sigue usando /health.
-    path('api/', include('accounts.urls')),
-    # path('', include('auth_api.urls')),
     # Versionamiento
     path("api/v1/health", health),
     path('api/v1/', include('Login.urls')),
+    path('api/v1/', include('users.urls')),
     path('api/v1/', include('dashboard.urls')),
     path('api/v1/', include('article.urls')),
     path('api/v1/', include('uploads.urls')),

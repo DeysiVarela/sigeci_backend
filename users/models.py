@@ -1,13 +1,5 @@
-"""
-Modelos del módulo de usuarios, perfiles y permisos.
-
-Los nombres de tabla y de columna siguen el ERD del equipo
-(users, profile, profile_action). La tabla `password_reset_pin`
-NO está en el ERD: se agrega para SCRUM-15 (recuperación con PIN).
-"""
 from django.contrib.auth.hashers import check_password, make_password
 from django.db import models
-
 
 class Profile(models.Model):
     """Perfil/rol: ADMIN | MEMBER | AUTHOR."""
@@ -25,12 +17,7 @@ class Profile(models.Model):
 
 
 class ProfileAction(models.Model):
-    """
-    Matriz de permisos: una fila por (perfil, recurso, permiso).
-
-    action      -> article | event | application | user | user_role
-    permissions -> view | create | update | delete | active | inactive | download
-    """
+    """Matriz de permisos por perfil y módulo."""
 
     profile_action_id = models.AutoField(primary_key=True)
     profile = models.ForeignKey(
@@ -55,11 +42,7 @@ class ProfileAction(models.Model):
 
 
 class User(models.Model):
-    """
-    Usuario del sistema. No usa django.contrib.auth.User (la BD ya tiene
-    las migraciones iniciales aplicadas): la contraseña se guarda con los
-    hashers de Django y la sesión se maneja con JWT.
-    """
+    """Usuario del sistema (tabla `users` y relación M:N `user_profiles`)."""
 
     PROVIDER_ACCOUNT = "ACCOUNT"
     PROVIDER_GMAIL = "GMAIL"
@@ -77,7 +60,6 @@ class User(models.Model):
     user_active = models.BooleanField(default=True)
     user_delete = models.BooleanField(default=False)
 
-    # Campos de auditoría (recuadro "Definition" del ERD)
     user_created_by = models.ForeignKey(
         "self", null=True, blank=True, on_delete=models.SET_NULL,
         db_column="user_created_by", related_name="+",
@@ -96,7 +78,6 @@ class User(models.Model):
     def __str__(self):
         return self.user_email
 
-    # --- Contrato mínimo que DRF espera de request.user ---
     @property
     def is_authenticated(self):
         return True
@@ -105,44 +86,42 @@ class User(models.Model):
     def is_anonymous(self):
         return False
 
-    # --- Contraseña ---
     def set_password(self, raw_password):
         self.user_password = make_password(raw_password)
 
     def check_password(self, raw_password):
         return check_password(raw_password, self.user_password)
 
-    # --- Permisos por perfil ---
     def has_perm_on(self, action, permission):
-        # Busca en todos los roles del usuario
-        return ProfileAction.objects.filter(
-            profile__in=self.profiles.all(),
-            profile__profile_active=True,
-            profile__profile_delete=False,
-            profile_action_active=True,
-            profile_action_delete=False,
-            profile_action_action=action,
-            profile_action_permissions=permission,
-        ).exists()
-
-    def permissions_map(self):
-        # Obtiene los permisos de todos los roles del usuario
         rows = ProfileAction.objects.filter(
             profile__in=self.profiles.all(),
             profile__profile_active=True,
             profile__profile_delete=False,
             profile_action_active=True,
             profile_action_delete=False,
-        ).values_list("profile_action_action", "profile_action_permissions").distinct()
-        
+            profile_action_action=action,
+        ).values_list("profile_action_permissions", flat=True)
+        return any(permission in (perms or "").split("|") for perms in rows)
+
+    def permissions_map(self):
+        rows = ProfileAction.objects.filter(
+            profile__in=self.profiles.all(),
+            profile__profile_active=True,
+            profile__profile_delete=False,
+            profile_action_active=True,
+            profile_action_delete=False,
+        ).values_list("profile_action_action", "profile_action_permissions")
+
         result = {}
-        for action, perm in rows:
-            result.setdefault(action, []).append(perm)
+        for action, perms in rows:
+            for perm in (perms or "").split("|"):
+                if perm and perm not in result.setdefault(action, []):
+                    result[action].append(perm)
         return result
 
 
 class PasswordResetPin(models.Model):
-    """PIN temporal de recuperación. Se guarda hasheado, nunca en claro."""
+    """PIN temporal de recuperación (hasheado)."""
 
     pin_id = models.AutoField(primary_key=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="reset_pins")

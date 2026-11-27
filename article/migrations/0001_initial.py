@@ -9,7 +9,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('accounts', '0001_initial'),
+        ('users', '0001_initial'),
     ]
 
     operations = [
@@ -25,8 +25,8 @@ class Migration(migrations.Migration):
                 ('article_active', models.BooleanField(default=True)),
                 ('article_created_at', models.DateTimeField(auto_now_add=True)),
                 ('article_updated_at', models.DateTimeField(auto_now=True)),
-                ('article_created_by', models.ForeignKey(blank=True, db_column='article_created_by', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to='accounts.user')),
-                ('article_updated_by', models.ForeignKey(blank=True, db_column='article_updated_by', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to='accounts.user')),
+                ('article_created_by', models.ForeignKey(blank=True, db_column='article_created_by', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to='users.user')),
+                ('article_updated_by', models.ForeignKey(blank=True, db_column='article_updated_by', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to='users.user')),
             ],
             options={
                 'db_table': 'article',
@@ -43,8 +43,8 @@ class Migration(migrations.Migration):
                 ('article_attached_created_at', models.DateTimeField(auto_now_add=True)),
                 ('article_attached_updated_at', models.DateTimeField(auto_now=True)),
                 ('article', models.ForeignKey(db_column='article_id', on_delete=django.db.models.deletion.CASCADE, related_name='attachments', to='article.article')),
-                ('article_attached_created_by', models.ForeignKey(blank=True, db_column='article_attached_created_by', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to='accounts.user')),
-                ('article_attached_updated_by', models.ForeignKey(blank=True, db_column='article_attached_updated_by', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to='accounts.user')),
+                ('article_attached_created_by', models.ForeignKey(blank=True, db_column='article_attached_created_by', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to='users.user')),
+                ('article_attached_updated_by', models.ForeignKey(blank=True, db_column='article_attached_updated_by', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to='users.user')),
             ],
             options={
                 'db_table': 'article_attached',
@@ -62,9 +62,9 @@ class Migration(migrations.Migration):
                 ('article_reviewer_updated_at', models.DateTimeField(auto_now=True)),
                 ('article', models.ForeignKey(db_column='article_id', on_delete=django.db.models.deletion.CASCADE, related_name='reviewers', to='article.article')),
                 ('article_attached', models.ForeignKey(blank=True, db_column='article_attached_id', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='reviews', to='article.articleattached')),
-                ('article_reviewer_created_by', models.ForeignKey(blank=True, db_column='article_reviewer_created_by', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to='accounts.user')),
-                ('article_reviewer_updated_by', models.ForeignKey(blank=True, db_column='article_reviewer_updated_by', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to='accounts.user')),
-                ('user', models.ForeignKey(db_column='user_id', on_delete=django.db.models.deletion.CASCADE, related_name='article_assignments', to='accounts.user')),
+                ('article_reviewer_created_by', models.ForeignKey(blank=True, db_column='article_reviewer_created_by', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to='users.user')),
+                ('article_reviewer_updated_by', models.ForeignKey(blank=True, db_column='article_reviewer_updated_by', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to='users.user')),
+                ('user', models.ForeignKey(db_column='user_id', on_delete=django.db.models.deletion.CASCADE, related_name='article_assignments', to='users.user')),
             ],
             options={
                 'db_table': 'article_reviewer',
@@ -80,8 +80,8 @@ class Migration(migrations.Migration):
                 ('topic_active', models.BooleanField(default=True)),
                 ('topic_created_at', models.DateTimeField(auto_now_add=True)),
                 ('topic_updated_at', models.DateTimeField(auto_now=True)),
-                ('topic_created_by', models.ForeignKey(blank=True, db_column='topic_created_by', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to='accounts.user')),
-                ('topic_updated_by', models.ForeignKey(blank=True, db_column='topic_updated_by', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to='accounts.user')),
+                ('topic_created_by', models.ForeignKey(blank=True, db_column='topic_created_by', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to='users.user')),
+                ('topic_updated_by', models.ForeignKey(blank=True, db_column='topic_updated_by', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to='users.user')),
             ],
             options={
                 'db_table': 'topic',
